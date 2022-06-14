@@ -10,7 +10,7 @@ from collections import OrderedDict
 import continual_benchmark.dataloaders.base
 import continual_benchmark.dataloaders as dataloaders
 from continual_benchmark.dataloaders.datasetGen import data_split
-from vae_experiments import multiband_training, replay_training
+from vae_experiments import multiband_training, classifier_training, replay_training
 
 from vae_experiments import vae_utils
 from vae_experiments.validation import Validator, CERN_Validator
@@ -29,6 +29,7 @@ def run(args):
         n_classes = 10
     else:
         n_classes = train_dataset.number_classes
+
     n_batches = args.num_batches
     train_dataset_splits, val_dataset_splits, task_output_space = data_split(dataset=train_dataset,
                                                                              dataset_name=args.dataset.lower(),
@@ -42,9 +43,9 @@ def run(args):
                                                                              limit_classes=args.limit_classes)
 
     if args.training_procedure == "replay":
-        from vae_experiments import models_definition  # models_definition_replay as models_definition
+        from vae_experiments import models_definition, classifier  # models_definition_replay as models_definition
     else:
-        from vae_experiments import models_definition
+        from vae_experiments import models_definition, classifier
     # Calculate constants
 
     labels_tasks = {}
@@ -65,6 +66,13 @@ def run(args):
     test_fid_table = OrderedDict()
     fid_local_vae = OrderedDict()
 
+    # Prepare feature extractor
+    feature_extractor = classifier.FeatureExtractor(latent_size=args.gen_latent_size, d=args.gen_d, cond_dim=n_classes, 
+                                                    cond_p_coding=args.gen_cond_p_coding, cond_n_dim_coding=args.gen_cond_n_dim_coding, 
+                                                    device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
+    
+    print(feature_extractor)
+
     # Prepare VAE
     local_vae = models_definition.VAE(latent_size=args.gen_latent_size, binary_latent_size=args.binary_latent_size,
                                       d=args.gen_d,
@@ -83,6 +91,7 @@ def run(args):
     train_loaders = []
     train_loaders_big = []
     val_loaders = []
+
     for task_name in range(n_tasks):
         train_dataset_loader = data.DataLoader(dataset=train_dataset_splits[task_name],
                                                batch_size=args.gen_batch_size, shuffle=True,
@@ -112,6 +121,7 @@ def run(args):
         else:
             validator = CERN_Validator(dataloaders=val_loaders, stats_file_name=stats_file_name, device=device)
     curr_global_decoder = None
+    
     for task_id in range(len(task_names)):
         print("######### Task number {} #########".format(task_id))
         task_name = task_names[task_id]
@@ -136,12 +146,26 @@ def run(args):
                                                                                train_dataset_loader_big=train_dataset_loader_big,
                                                                                task_id=task_id, class_table=class_table)
             class_table[task_id] = tmp_table
+        if args.training_procedure == "classifier":
+            feature_extractor, curr_global_decoder = classifier_training.train_classifier(args=args, models_definition=models_definition,
+                                                                     local_vae=local_vae,
+                                                                     curr_global_decoder=curr_global_decoder,
+                                                                     feature_extractor=feature_extractor,
+                                                                     task_id=task_id,
+                                                                     train_dataset_loader=train_dataset_loader,
+                                                                     train_dataset_split=train_dataset_splits[task_id],
+                                                                     train_dataset_loader_big=train_dataset_loader_big,
+                                                                     class_table=class_table, n_classes=n_classes,
+                                                                     device=device)
         else:
             print("Wrong training procedure")
             return None
 
+        # save feature extractor
+        torch.save(feature_extractor, f"results/{args.experiment_name}/model{task_id}_feature_extractor")
+
         # Plotting results for already learned tasks
-        if not args.gen_load_pretrained_models:
+        if not args.gen_load_pretrained_models and args.training_procedure != "classifier":
             vae_utils.plot_results(args.experiment_name, curr_global_decoder, class_table, task_id,
                                    translate_noise=translate_noise, same_z=False)
             if args.training_procedure == "multiband":
@@ -155,31 +179,31 @@ def run(args):
         fid_table[task_name] = OrderedDict()
         precision_table[task_name] = OrderedDict()
         recall_table[task_name] = OrderedDict()
-        if args.skip_validation:
-            for j in range(task_id + 1):
-                fid_table[j][task_name] = -1
-        else:
-            if (args.training_procedure == "multiband") and (not args.gen_load_pretrained_models):
-                fid_result, precision, recall = validator.calculate_results(curr_global_decoder=local_vae.decoder,
-                                                                            class_table=class_table,
-                                                                            task_id=task_id, translate_noise=translate_noise,
-                                                                            starting_point=local_vae.starting_point,
-                                                                            dataset=args.dataset)
-                fid_local_vae[task_id] = fid_result
-                print(f"FID local VAE: {fid_result}")
-            for j in range(task_id + 1):
-                val_name = task_names[j]
-                print('validation split name:', val_name)
-                fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
-                                                                            class_table=class_table,
-                                                                            task_id=j,
-                                                                            translate_noise=translate_noise,
-                                                                            dataset=args.dataset)  # task_id != 0)
-                fid_table[j][task_name] = fid_result
-                precision_table[j][task_name] = precision
-                recall_table[j][task_name] = recall
-                print(f"FID task {j}: {fid_result}")
-        local_vae.decoder = copy.deepcopy(curr_global_decoder)
+        # if args.skip_validation:
+        #     for j in range(task_id + 1):
+        #         fid_table[j][task_name] = -1
+        # else:
+        #     if (args.training_procedure == "multiband") and (not args.gen_load_pretrained_models):
+        #         fid_result, precision, recall = validator.calculate_results(curr_global_decoder=local_vae.decoder,
+        #                                                                     class_table=class_table,
+        #                                                                     task_id=task_id, translate_noise=translate_noise,
+        #                                                                     starting_point=local_vae.starting_point,
+        #                                                                     dataset=args.dataset)
+        #         fid_local_vae[task_id] = fid_result
+        #         print(f"FID local VAE: {fid_result}")
+        #     for j in range(task_id + 1):
+        #         val_name = task_names[j]
+        #         print('validation split name:', val_name)
+        #         fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
+        #                                                                     class_table=class_table,
+        #                                                                     task_id=j,
+        #                                                                     translate_noise=translate_noise,
+        #                                                                     dataset=args.dataset)  # task_id != 0)
+        #         fid_table[j][task_name] = fid_result
+        #         precision_table[j][task_name] = precision
+        #         recall_table[j][task_name] = recall
+        #         print(f"FID task {j}: {fid_result}")
+        # local_vae.decoder = copy.deepcopy(curr_global_decoder)
     return fid_table, task_names, test_fid_table, precision_table, recall_table, fid_local_vae
 
 
@@ -198,7 +222,7 @@ def get_args(argv):
                         help="Compute FID on validation dataset instead of validation dataset")
     parser.add_argument('--val_batch_size', type=int, default=250)
     parser.add_argument('--skip_validation', default=False, action='store_true')
-    parser.add_argument('--training_procedure', type=str, default='multiband',
+    parser.add_argument('--training_procedure', type=str, default='classifier',
                         help='Training procedure multiband|replay')
 
     # Data
@@ -253,9 +277,9 @@ def get_args(argv):
     parser.add_argument('--gen_ae_epochs', type=int, default=70,
                         help="Number of epochs to train local variational autoencoder")
     parser.add_argument('--global_dec_epochs', type=int, default=140, help="Number of epochs to train global decoder")
-    parser.add_argument('--gen_load_pretrained_models', default=False, action='store_true',
+    parser.add_argument('--gen_load_pretrained_models', default=True, action='store_true',
                         help="Load pretrained generative models")
-    parser.add_argument('--gen_pretrained_models_dir', type=str, default="results/pretrained_models",
+    parser.add_argument('--gen_pretrained_models_dir', type=str, default="results/MNIST_example/",
                         help="Directory of pretrained generative models")
     parser.add_argument('--standard_embeddings', dest='standard_embeddings', default=False, action='store_true',
                         help="Train multiband with standard embeddings instead of matrix")

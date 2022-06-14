@@ -198,6 +198,7 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
         if epoch == warmup_rounds:
             optimizer = torch.optim.Adam(list(global_decoder.parameters()), lr=global_lr)
             scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
+
         for iteration in range(n_iterations):
             # Building dataset from previous global model and local model
             recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = generate_previous_data(
@@ -277,3 +278,39 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
                 print(
                     f"Epoch: {epoch} - changing from batches: {[(idx, n_changes) for idx, n_changes in enumerate(sum_changed.tolist())]}")
     return global_decoder
+
+def train_feature_extractor(feature_extractor, task_loader, n_epochs,
+                            local_start_lr=0.001, scheduler_rate=0.99):
+    feature_extractor.train()
+    lr = local_start_lr
+    print(f"feature extractor's lr set to: {lr}")
+
+    criterion = nn.MSELoss(reduction="sum") # add criterion
+    optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr / 10, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
+    
+    for epoch in range(n_epochs):
+        losses = []
+        start = time.time()
+
+        for iteration, batch in enumerate(task_loader):
+
+            x = batch[0].to(feature_extractor.device)
+            y = batch[1]
+
+            optimizer.zero_grad()
+
+            out = feature_extractor(x)
+            loss = criterion(out, y)
+            loss.backward()
+            optimizer.step()
+
+            losses.append(loss.item())
+        
+        scheduler.step()
+        if epoch % 1 == 0:
+            print("Epoch: {}/{}, loss: {}, took: {} s".format(epoch, n_epochs,
+                                                                np.round(np.mean(losses), 3),
+                                                                np.round(time.time() - start), 3))
+
+    return feature_extractor
