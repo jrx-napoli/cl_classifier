@@ -36,8 +36,11 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
 
     if not task_id:
         # First task, initializing global decoder as local_vae's decoder
-        curr_global_decoder = copy.deepcopy(local_vae.decoder)
-
+        if args.gen_load_pretrained_models:
+            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            print(f'Loaded global decoder')
+        else:
+            curr_global_decoder = copy.deepcopy(local_vae.decoder)
     else:
         # Retraining global decoder with previous global decoder and new data
         if args.gen_load_pretrained_models:
@@ -66,11 +69,11 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
                                                                           experiment_name=args.experiment_name,
                                                                           visualise_latent=args.visualise_latent)
             print("Done training global decoder\n")
-    curr_global_decoder.class_table = class_table
+            curr_global_decoder.class_table = class_table
 
 
     # Classifier training
-
+    class_table = curr_global_decoder.class_table
     if args.gen_load_feature_extractor:
         feature_extractor = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
         print("Loaded feature extractor")

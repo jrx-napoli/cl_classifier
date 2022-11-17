@@ -21,32 +21,32 @@ from visualise import *
 import time
 
 
-# curr_global_decoder = torch.load(f'results/dual/class_based/FashionMNIST_example/model1_curr_decoder')
-# print(curr_global_decoder.ones_distribution)
-# print(curr_global_decoder.class_table)
+curr_global_decoder = torch.load(f'results/class_based/FashionMNIST_example/model4_curr_decoder')
+print(curr_global_decoder.ones_distribution)
+print(curr_global_decoder.class_table)
 
-# class_table = curr_global_decoder.class_table
-# batch_size = 64
-# n_prev_examples = 100
-# recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
-#     curr_global_decoder,
-#     class_table=class_table,
-#     n_tasks=2,
-#     n_img=n_prev_examples,
-#     num_local=batch_size,
-#     return_z=True,
-#     translate_noise=True,
-#     same_z=False,
-#     equal_split=True)
-# z_prev, z_bin_prev = z_prev
+class_table = curr_global_decoder.class_table
+batch_size = 64
+n_prev_examples = 250
+recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
+    curr_global_decoder,
+    class_table=class_table,
+    n_tasks=5,
+    n_img=n_prev_examples,
+    num_local=batch_size,
+    return_z=True,
+    translate_noise=True,
+    same_z=False,
+    equal_split=True)
+z_prev, z_bin_prev = z_prev
 
-# fig = plt.figure()
-# for i in range(50):
-#     plt.subplot(5,10,i+1)
-#     plt.tight_layout()
-#     plt.imshow(recon_prev[i+50][0].cpu(), cmap='gray', interpolation='none')
-#     plt.title("Ground Truth: {}".format(classes_prev[i+50]))
-#     plt.xticks([])
-#     plt.yticks([])
-# plt.show()
-# time.sleep(10)
+fig = plt.figure()
+for i in range(50):
+    plt.subplot(5,10,i+1)
+    plt.tight_layout()
+    plt.imshow(recon_prev[i+200][0].cpu(), cmap='gray', interpolation='none')
+    plt.title("Ground Truth: {}".format(classes_prev[i+200]))
+    plt.xticks([])
+    plt.yticks([])
+plt.show()
+time.sleep(10)
