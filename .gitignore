@@ -1,3 +1,7 @@
 # **/results
 multiband_vae/results
 multiband_vae/wandb
+multiband_vae/mnist_data
+multiband_vae/data
+data
+mnist_data

@@ -10,7 +10,7 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
 
     # Multiband VAE training
     if args.gen_load_pretrained_models:
-        local_vae=torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_local_vae').to(device)
+        local_vae=torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_local_vae').to(device)
         print(f'Loaded local VAE')
     else:
         if task_id == 0:
@@ -41,7 +41,7 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
     else:
         # Retraining global decoder with previous global decoder and new data
         if args.gen_load_pretrained_models:
-            curr_global_decoder = torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
             print(f'Loaded global decoder')
         else:
             print("\nTrain global decoder")
@@ -72,7 +72,7 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
     # Classifier training
 
     if args.gen_load_feature_extractor:
-        feature_extractor = torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
+        feature_extractor = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
@@ -93,7 +93,7 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
 
 
     if args.gen_load_head:
-        current_head = torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_head').to(device)
+        current_head = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_head').to(device)
         print("Loaded head")
     else:
         print("\nTrain classifier head")

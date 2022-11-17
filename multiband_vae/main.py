@@ -217,14 +217,14 @@ def run(args):
         
         # if not using pretrained models, save multiband 
         if not args.gen_load_pretrained_models:
-            torch.save(local_vae, f"results/dual/class_based/{args.experiment_name}/model{task_id}_local_vae")
+            torch.save(local_vae, f"results/class_based/{args.experiment_name}/model{task_id}_local_vae")
             torch.save(curr_global_decoder, f"results/dual/class_based/{args.experiment_name}/model{task_id}_curr_decoder")
 
 
         # save feature extractor and current head
         if args.training_procedure == "classifier":
-            torch.save(feature_extractor, f"results/dual/class_based/{args.experiment_name}/model{task_id}_feature_extractor")
-            torch.save(head, f"results/dual/class_based/{args.experiment_name}/model{task_id}_head")
+            torch.save(feature_extractor, f"results/class_based/{args.experiment_name}/model{task_id}_feature_extractor")
+            torch.save(head, f"results/class_based/{args.experiment_name}/model{task_id}_head")
 
             cv = classifier_utils.ClassifierValidator()
 

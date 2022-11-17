@@ -9,7 +9,7 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
 
     if args.gen_load_pretrained_models:
         # local_vae=torch.load(args.gen_pretrained_models_dir + f'model{task_id}_local_vae').to(device)
-        local_vae=torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_local_vae').to(device)
+        local_vae=torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_local_vae').to(device)
     else:
         if task_id == 0:
             n_epochs = args.gen_ae_epochs + args.global_dec_epochs
@@ -34,7 +34,7 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
         # Retraining global decoder with previous global decoder and new data
         if args.gen_load_pretrained_models:
             # curr_global_decoder = torch.load(args.gen_pretrained_models_dir + f'model{task_id}_curr_decoder').to(device)
-            curr_global_decoder = torch.load(f'results/dual/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
         else:
             curr_global_decoder = training_functions.train_global_decoder(curr_global_decoder=curr_global_decoder,
                                                                           local_vae=local_vae,

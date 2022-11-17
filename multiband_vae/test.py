@@ -20,12 +20,10 @@ from vae_experiments import models_definition, classifier
 from visualise import *
 import time
 
-torch.cuda.empty_cache()
+
 # curr_global_decoder = torch.load(f'results/dual/class_based/FashionMNIST_example/model1_curr_decoder')
 # print(curr_global_decoder.ones_distribution)
 # print(curr_global_decoder.class_table)
-
-
 
 # class_table = curr_global_decoder.class_table
 # batch_size = 64
