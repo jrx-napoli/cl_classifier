@@ -7,7 +7,6 @@ import torch.utils.data as data
 class FeatureExtractorDataset(data.Dataset):
     def __init__(self, datasets, encoder, translator, decoder, task_id, class_table, latent_size, gen_batch_size):
         
-        # batch_size = datasets[0][0][0].size(0)
         batch_size = gen_batch_size
         task_id_int_copy = task_id
         if not torch.is_tensor(task_id):
@@ -49,7 +48,6 @@ class FeatureExtractorDataset(data.Dataset):
         print(f'-> gen_samples_only: {gen_samples_only}')
         
         with torch.no_grad():
-            # batch_size = datasets[0][0][0].size(0)
             batch_size = gen_batch_size
             
             # Real samples from current task
@@ -58,17 +56,16 @@ class FeatureExtractorDataset(data.Dataset):
                 for dataset in datasets:
                     for sample, target in iter(dataset):
                         x.append(sample.to(encoder.device))
-                        means, log_var, binary_out = encoder(sample.to(encoder.device), target)
+                        means, log_var = encoder(sample.to(encoder.device), target)
                         std = torch.exp(0.5 * log_var)
                         batch_size = sample.size(0)
                         eps = torch.randn([batch_size, latent_size]).to(encoder.device)
                         z = eps * std + means
-                        new_data = translator(z, binary_out, task_id)
+                        new_data = translator(z, task_id)
                         y.append(torch.squeeze(new_data))
 
             # Generated-only images from current task
-            n_prev_examples = 8000 * (n_tasks + 1)
-
+            n_prev_examples = 6000
             recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
                 decoder,
                 class_table=class_table,
@@ -78,27 +75,22 @@ class FeatureExtractorDataset(data.Dataset):
                 return_z=True,
                 translate_noise=True,
                 same_z=False,
-                equal_split=True)
-            z_prev, z_bin_prev = z_prev
+                equal_split=True,
+                recent_task_only=True)
 
             # add generated samples to dataset
             current_task_counter = 0
             for i in range(n_prev_examples):
-                if task_ids_prev[i] == n_tasks:
-                    current_task_id = torch.zeros([1, 1]) + classes_prev[i]
-                    translated_z = translator(torch.unsqueeze(z_prev[i], 0), torch.unsqueeze(z_bin_prev[i], 0), current_task_id)
-                    x.append(recon_prev[i])
-                    y.append(torch.squeeze(translated_z))
-                    current_task_counter += 1
+                current_task_id = torch.zeros([1, 1]) + classes_prev[i]
+                translated_z = translator(torch.unsqueeze(z_prev[i], 0), current_task_id)
+                x.append(recon_prev[i])
+                y.append(torch.squeeze(translated_z))
+                current_task_counter += 1
             print(f'Adding {current_task_counter} generated samples from current task...')
 
             # generated samples from previous tasks
             if n_tasks > 0:
-                # limit_previous_examples = 1
-                # n_prev_examples = int(gen_batch_size * 10 * min(task_id, 4) * limit_previous_examples) # different batch size
                 n_prev_examples = current_task_counter
-
-                print(f'Adding {n_prev_examples} generated samples from previous tasks...')
                 recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
                     decoder,
                     class_table=class_table,
@@ -109,14 +101,14 @@ class FeatureExtractorDataset(data.Dataset):
                     translate_noise=True,
                     same_z=False,
                     equal_split=True)
-                z_prev, z_bin_prev = z_prev
 
                 # add generated samples to dataset
                 for i in range(n_prev_examples):
                     current_task_id = torch.zeros([1, 1]) + classes_prev[i]
-                    translated_z = translator(torch.unsqueeze(z_prev[i], 0), torch.unsqueeze(z_bin_prev[i], 0), current_task_id)
+                    translated_z = translator(torch.unsqueeze(z_prev[i], 0), current_task_id)
                     x.append(recon_prev[i])
                     y.append(torch.squeeze(translated_z))
+                print(f'Adding {n_prev_examples} generated samples from previous tasks...')
                 
         print(f'Done creating FeatureExtractorDataset\n')
         return x, y
@@ -124,9 +116,7 @@ class FeatureExtractorDataset(data.Dataset):
 class HeadDataset(data.Dataset):
     def __init__(self, datasets, encoder, decoder, task_id, class_table, binary_head, gen_samples_only, gen_batch_size, global_benchmark=False):
         
-        # batch_size = datasets[0][0][0].size(0)
         batch_size = gen_batch_size
-
         task_id_int_copy = task_id
         if not torch.is_tensor(task_id):
             if task_id != None:
@@ -134,24 +124,15 @@ class HeadDataset(data.Dataset):
             else:
                 task_id = torch.zeros([batch_size, 1])
 
-        if not binary_head:
-            img, labels = self._create_dataset(datasets=datasets, 
-                                                encoder=encoder, 
-                                                decoder=decoder, 
-                                                task_id=task_id, 
-                                                n_tasks=task_id_int_copy, 
-                                                class_table=class_table, 
-                                                gen_samples_only = gen_samples_only,
-                                                gen_batch_size=gen_batch_size,
-                                                global_benchmark=global_benchmark)
-        else:
-            img, labels = self._create_binary_dataset(datasets=datasets, 
-                                                        encoder=encoder, 
-                                                        decoder=decoder, 
-                                                        n_tasks=task_id_int_copy, 
-                                                        class_table=class_table, 
-                                                        gen_batch_size=gen_batch_size,
-                                                        gen_samples_only=gen_samples_only)
+        img, labels = self._create_dataset(datasets=datasets, 
+                                            encoder=encoder, 
+                                            decoder=decoder, 
+                                            task_id=task_id, 
+                                            n_tasks=task_id_int_copy, 
+                                            class_table=class_table, 
+                                            gen_samples_only = gen_samples_only,
+                                            gen_batch_size=gen_batch_size,
+                                            global_benchmark=global_benchmark)
 
         self.img_data = img
         self.img_labels = labels
@@ -163,54 +144,6 @@ class HeadDataset(data.Dataset):
     def __getitem__(self, idx):
         return self.img_data[idx], self.img_labels[idx]
 
-    def _create_binary_dataset(self, datasets, encoder, decoder, n_tasks, class_table, gen_batch_size, gen_samples_only=True):
-        x = []
-        y = []
-        num_samples = 0
-        for dataset in datasets:
-            num_samples += len(dataset)
-
-        print(f'\nCreating binary classification HeadDataset')
-        print(f'-> number of provided samples: {num_samples}')
-        print(f'-> gen_samples_only: {gen_samples_only}')
-
-        with torch.no_grad():
-            # real samples
-            if not gen_samples_only:
-                print('Adding real samples...')
-                for dataset in datasets:
-                    for sample, target in iter(dataset):
-                        x.append(sample.to(encoder.device))
-                        y.append(float(target))
-            
-            batch_size = datasets[0][0][0].size(0)
-            n_prev_examples = num_samples * (n_tasks + 1)
-            recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
-                decoder,
-                class_table=class_table,
-                n_tasks=n_tasks+1,
-                n_img=n_prev_examples,
-                num_local=batch_size,
-                return_z=True,
-                translate_noise=True,
-                same_z=False,
-                equal_split=True)
-            z_prev, z_bin_prev = z_prev
-
-            # classify and add generated samples to dataset
-            current_task_counter = 0
-            for i in range(n_prev_examples):
-                if task_ids_prev[i] == n_tasks:
-                    current_task_counter += 1
-                    x.append(recon_prev[i])
-                    y.append(classes_prev[i])
-            print(f'Adding {current_task_counter} generated samples from current task...')
-
-            for i, target in enumerate(y):
-                y[i] = y[i] % 2
-
-        print(f'Done creating binary classification HeadDataset\n')
-        return x, y
 
     def _create_dataset(self, datasets, encoder, decoder, task_id, n_tasks, class_table, gen_batch_size, 
                         gen_samples_only=True, global_benchmark=False):
@@ -232,7 +165,6 @@ class HeadDataset(data.Dataset):
             # Global benchmark
             if global_benchmark and task_id == 4:
                 print('Creating dataset for a global benchmark...')
-                # batch_size = datasets[0][0][0].size(0)
                 batch_size = gen_batch_size
                 n_prev_examples = num_samples * 3
                 recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
@@ -245,7 +177,6 @@ class HeadDataset(data.Dataset):
                     translate_noise=True,
                     same_z=False,
                     equal_split=True)
-                z_prev, z_bin_prev = z_prev
 
                 # classify and add generated samples to dataset
                 for i in range(n_prev_examples):
@@ -263,9 +194,8 @@ class HeadDataset(data.Dataset):
                             y.append(float(target))
 
                 # generated samples from current task
-                # batch_size = datasets[0][0][0].size(0)
                 batch_size = gen_batch_size
-                n_prev_examples = 8000 * (n_tasks + 1)
+                n_prev_examples = 6000
                 recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
                     decoder,
                     class_table=class_table,
@@ -275,16 +205,15 @@ class HeadDataset(data.Dataset):
                     return_z=True,
                     translate_noise=True,
                     same_z=False,
-                    equal_split=True)
-                z_prev, z_bin_prev = z_prev
+                    equal_split=True,
+                    recent_task_only=True)
 
                 # classify and add generated samples to dataset
                 current_task_counter = 0
                 for i in range(n_prev_examples):
-                    if task_ids_prev[i] == n_tasks:
-                        current_task_counter += 1
-                        x.append(recon_prev[i])
-                        y.append(classes_prev[i])
+                    current_task_counter += 1
+                    x.append(recon_prev[i])
+                    y.append(classes_prev[i])
                 print(f'Adding {current_task_counter} generated samples from current task...')
 
                 # generated samples from previous tasks
@@ -301,7 +230,6 @@ class HeadDataset(data.Dataset):
                         translate_noise=True,
                         same_z=False,
                         equal_split=True)
-                    z_prev, z_bin_prev = z_prev
 
                     # classify and add generated samples to dataset
                     for i in range(n_prev_examples):

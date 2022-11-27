@@ -78,16 +78,17 @@ class Validator:
                 # bin_z = torch.bernoulli(curr_global_decoder.ones_distribution[task_id].repeat([len(y), 1])).to(
                 #     self.device)
                 
-                bin_z = torch.zeros(len(y), curr_global_decoder.binary_latent_size).to(self.device)
-                j = 0
-                for i, bin_z_sample in enumerate(bin_z):
-                    sampled_class = y[j]
-                    bin_z[i] = torch.bernoulli(curr_global_decoder.ones_distribution[task_id][sampled_class])
-                    j += 1
+                # bin_z = torch.zeros(len(y), curr_global_decoder.binary_latent_size).to(self.device)
+                # j = 0
+                # for i, bin_z_sample in enumerate(bin_z):
+                #     sampled_class = y[j]
+                #     bin_z[i] = torch.bernoulli(curr_global_decoder.ones_distribution[task_id][sampled_class])
+                #     j += 1
 
 
                 # bin_z = torch.rand([len(y), curr_global_decoder.binary_latent_size]).to(self.device)
-                bin_z = bin_z * 2 - 1
+                # bin_z = bin_z * 2 - 1
+                
                 y = y.sort()[0]
                 labels, counts = torch.unique_consecutive(y, return_counts=True)
                 if sample_tasks:
@@ -104,7 +105,7 @@ class Validator:
                         task_ids = torch.zeros(len(y)) + starting_point
                     else:
                         task_ids = torch.zeros(len(y)) + task_id
-                example = generate_images(curr_global_decoder, z, bin_z, task_ids, y, translate_noise=translate_noise)
+                example = generate_images(curr_global_decoder, z, task_ids, y, translate_noise=translate_noise)
                 if not precalculated_statistics:
                     if dataset.lower() in ["fashionmnist", "doublemnist"]:
                         x = x.repeat([1, 3, 1, 1])

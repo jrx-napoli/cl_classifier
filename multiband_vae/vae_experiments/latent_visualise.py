@@ -37,16 +37,16 @@ class Visualizer:
                                                                                                   num_local=n_samples // self.task_id)
 
         orig_images = orig_images[:n_samples], orig_labels[:n_samples]
-        means, log_var, bin_z = encoder(orig_images[0].to(encoder.device),
+        means, log_var = encoder(orig_images[0].to(encoder.device),
                                         orig_images[1].to(encoder.device))
         std = torch.exp(0.5 * log_var)
-        binary_out = torch.distributions.Bernoulli(logits=bin_z).sample()
-        z_bin_current_compare = binary_out * 2 - 1
+        # binary_out = torch.distributions.Bernoulli(logits=bin_z).sample()
+        # z_bin_current_compare = binary_out * 2 - 1
         eps = torch.randn([len(orig_images[0]), decoder.latent_size]).to(encoder.device)
         z_current_compare = eps * std + means
         task_ids_current_compare = torch.zeros(len(orig_images[0])) + self.task_id
         task_ids = torch.cat([task_ids_prev, task_ids_current_compare])
-        embeddings_curr = decoder.translator(z_current_compare, z_bin_current_compare, task_ids_current_compare)
+        embeddings_curr = decoder.translator(z_current_compare, task_ids_current_compare)
         embeddings = torch.cat([embeddings_prev, embeddings_curr]).cpu().detach()
         x_embedded = self.umap.fit_transform(embeddings.cpu())
         noises_to_plot = pd.DataFrame(x_embedded)
@@ -56,9 +56,9 @@ class Visualizer:
         examples_locations = []
         for i in self.selected_images:
             noise_tmp = z_prev[0][i].view(1, -1)
-            bin_tmp = z_prev[1][i].view(1, -1)
+            # bin_tmp = z_prev[1][i].view(1, -1)
             task_id_tmp = task_ids_prev[i].view(1, -1)
-            examples.append(decoder(noise_tmp, bin_tmp, task_id_tmp, None).detach().cpu().numpy().squeeze())
+            examples.append(decoder(noise_tmp, task_id_tmp, None).detach().cpu().numpy().squeeze())
             examples_locations.append(noises_to_plot.iloc[i])
 
         for i in range(len(self.selected_images) // self.task_id):

@@ -21,13 +21,12 @@ from visualise import *
 import time
 
 
-curr_global_decoder = torch.load(f'results/class_based/FashionMNIST_example/model4_curr_decoder')
-print(curr_global_decoder.ones_distribution)
-print(curr_global_decoder.class_table)
+curr_global_decoder = torch.load(f'results/class_based/MNIST_example/model4_curr_decoder')
+# print(curr_global_decoder.class_table)
 
 class_table = curr_global_decoder.class_table
 batch_size = 64
-n_prev_examples = 250
+n_prev_examples = 50
 recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
     curr_global_decoder,
     class_table=class_table,
@@ -38,14 +37,14 @@ recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.gen
     translate_noise=True,
     same_z=False,
     equal_split=True)
-z_prev, z_bin_prev = z_prev
+# z_prev, z_bin_prev = z_prev
 
 fig = plt.figure()
 for i in range(50):
     plt.subplot(5,10,i+1)
     plt.tight_layout()
-    plt.imshow(recon_prev[i+200][0].cpu(), cmap='gray', interpolation='none')
-    plt.title("Ground Truth: {}".format(classes_prev[i+200]))
+    plt.imshow(recon_prev[i][0].cpu(), cmap='gray', interpolation='none')
+    plt.title("Ground Truth: {}".format(classes_prev[i]))
     plt.xticks([])
     plt.yticks([])
 plt.show()
