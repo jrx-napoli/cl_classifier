@@ -1,5 +1,3 @@
-from multiprocessing.connection import wait
-from random import random
 from mpl_toolkits.axes_grid1 import ImageGrid
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,21 +48,15 @@ def plot_results(experiment_name, curr_global_decoder, class_table, n_tasks, n_i
 
     if same_z:
         z = torch.randn([n_img, curr_global_decoder.latent_size])
-        bin_z = torch.rand([n_img, curr_global_decoder.binary_latent_size]).to(curr_global_decoder.device)
-        bin_z = torch.round(bin_z) * 2 - 1
         z = z.repeat([n_tasks + 1, 1]).to(curr_global_decoder.device)
-        bin_z = bin_z.repeat([n_tasks + 1, 1]).to(curr_global_decoder.device)
     else:
         z = torch.randn([n_img * (n_tasks + 1), curr_global_decoder.latent_size]).to(curr_global_decoder.device)
-        ones_dist = torch.stack([curr_global_decoder.ones_distribution[int(task.item())] for task in task_ids])
-        bin_z = torch.bernoulli(ones_dist).to(curr_global_decoder.device)
-        bin_z = torch.round(bin_z) * 2 - 1
 
     sampled_classes = []
     for i in range(n_tasks + 1):  ## Including current class
         sampled_classes.append(class_samplers[i].sample([n_img]))
     sampled_classes = torch.cat(sampled_classes)
-    example = generate_images(curr_global_decoder, z, bin_z, task_ids, sampled_classes, translate_noise=translate_noise)
+    example = generate_images(curr_global_decoder, z, task_ids, sampled_classes, translate_noise=translate_noise)
     example = example.cpu().detach().numpy()
     fig = plt.figure(figsize=(10., 10.))
     grid = ImageGrid(fig, 111,
@@ -86,13 +78,13 @@ def plot_results(experiment_name, curr_global_decoder, class_table, n_tasks, n_i
     plt.close()
 
 
-def generate_images(curr_global_decoder, z, bin_z, task_ids, y, return_emb=False, translate_noise=True):
+def generate_images(curr_global_decoder, z, task_ids, y, return_emb=False, translate_noise=True):
     if return_emb:
-        example, emb = curr_global_decoder(z, bin_z, y, y, return_emb=return_emb,
+        example, emb = curr_global_decoder(z, y, y, return_emb=return_emb,
                                            translate_noise=translate_noise)
         return example, emb
     else:
-        example = curr_global_decoder(z, bin_z, y, y, return_emb=return_emb, translate_noise=translate_noise)
+        example = curr_global_decoder(z, y, y, return_emb=return_emb, translate_noise=translate_noise)
         return example
 
 
@@ -101,66 +93,33 @@ def generate_noise_for_previous_data(n_img, sampled_classes, n_task, latent_size
 
     if same_z:
         z_max = torch.randn([max(tasks_dist + torch.tensor([num_local])), latent_size]).to(device)
-        bin_rand = torch.rand([max(tasks_dist + torch.tensor([num_local])), binary_latent_size])
-        bin_z_max = (bin_rand < ones_distribution[len(ones_distribution) - 1][-1]).float().to(device) # last class of last task
-        bin_z_max = bin_z_max * 2 - 1
         z = []
-        bin_z = []
-        
         for task_id, n_img in enumerate(tasks_dist):
-            z.append(z_max[:n_img])
-            
-            bin_z_tmp = torch.rand([n_img + torch.tensor([num_local]), binary_latent_size])
-            for i, _ in enumerate(bin_z_tmp):
-                j = np.random.randint(0, len(sampled_classes))
-                sampled_class = sampled_classes[j]
-                bin_z_tmp[i] = (bin_rand[i] < ones_distribution[task_id][sampled_class]).float().to(device)
-
-            # bin_z_tmp = (bin_rand < ones_distribution[task_id][]).float().to(device)[:n_img]
-
-            bin_z_tmp = bin_z_tmp[:n_img]            
-            bin_z_tmp = bin_z_tmp * 2 - 1
-            bin_z_tmp = bin_z_tmp.to(device)
-            bin_z.append(bin_z_tmp)
-        
+            z.append(z_max[:n_img])            
         z = torch.cat(z)
-        bin_z = torch.cat(bin_z)
-        return z, z_max, bin_z, bin_z_max
+        return z, z_max
     else:
-
         z = torch.randn([n_img, latent_size]).to(device)
-
-        # bin_z = []
-        # for task_id, n_img in enumerate(tasks_dist):
-        #     bin_z_tmp = torch.bernoulli(ones_distribution[task_id][0].repeat([n_img, 1]))
-        #     bin_z.append(bin_z_tmp)
-        
-        # Choose ones distribution matching given class
-        bin_z = []
-        j = 0        
-        for task_id, n_img in enumerate(tasks_dist): 
-            bin_z_tmp = torch.zeros(n_img, binary_latent_size)
-            for i, bin_z_sample in enumerate(bin_z_tmp):
-                sampled_class = sampled_classes[j]
-                bin_z_tmp[i] = torch.bernoulli(ones_distribution[task_id][sampled_class])
-                j += 1
-            bin_z.append(bin_z_tmp)
-
-        bin_z = torch.cat(bin_z).to(device)
-        bin_z = torch.round(bin_z) * 2 - 1
-        return z, bin_z
+        return z
 
 
 def generate_previous_data(curr_global_decoder, class_table, n_tasks, n_img, num_local=0, translate_noise=True,
-                           same_z=False, return_z=False, equal_split=False):
+                           same_z=False, return_z=False, equal_split=False, recent_task_only=False):
     if equal_split:
-        # class_table[:n_tasks] = 1
-        pass
+        class_table[class_table > 0] = 1
+
     with torch.no_grad():
-        curr_class_table = class_table[:n_tasks]
+
+        if recent_task_only:
+            curr_class_table = class_table[n_tasks-1:n_tasks]
+            n_tasks = 1
+        else:    
+            curr_class_table = class_table[:n_tasks]
+        
         tasks_dist = torch.sum(curr_class_table, dim=1) * n_img // torch.sum(curr_class_table)
         tasks_dist[0:n_img - tasks_dist.sum()] += 1  # To fix the division
         assert sum(tasks_dist) == n_img
+
         task_ids = []
         for task_id in range(n_tasks):
             if tasks_dist[task_id] > 0:
@@ -177,23 +136,30 @@ def generate_previous_data(curr_global_decoder, class_table, n_tasks, n_img, num
         sampled_classes = torch.cat(sampled_classes)
         
         assert len(sampled_classes) == n_img
-        z_combined = generate_noise_for_previous_data(n_img, sampled_classes, n_tasks, curr_global_decoder.latent_size,
-                                                      curr_global_decoder.binary_latent_size, tasks_dist,
-                                                      curr_global_decoder.ones_distribution,
-                                                      device=curr_global_decoder.device, num_local=num_local,
+        z_combined = generate_noise_for_previous_data(n_img, 
+                                                      sampled_classes, 
+                                                      n_tasks, 
+                                                      curr_global_decoder.latent_size,
+                                                    #   curr_global_decoder.binary_latent_size, 
+                                                      None, # binary latent no longer supported
+                                                      tasks_dist,
+                                                    #   curr_global_decoder.ones_distribution,
+                                                      None, # same with ones dist.
+                                                      device=curr_global_decoder.device, 
+                                                      num_local=num_local,
                                                       same_z=same_z)
 
         if same_z:
-            z, _, bin_z, _ = z_combined
+            z, _ = z_combined
         else:
-            z, bin_z = z_combined
+            z = z_combined
 
         if return_z:
-            example, embeddings = generate_images(curr_global_decoder, z, bin_z, task_ids, sampled_classes,
+            example, embeddings = generate_images(curr_global_decoder, z, task_ids, sampled_classes,
                                                   return_emb=True,
                                                   translate_noise=translate_noise)
             return example, sampled_classes, z_combined, task_ids, embeddings
         else:
-            example = generate_images(curr_global_decoder, z, bin_z, task_ids, sampled_classes,
+            example = generate_images(curr_global_decoder, z, task_ids, sampled_classes,
                                       translate_noise=translate_noise)
             return example, sampled_classes
