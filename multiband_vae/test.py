@@ -21,7 +21,7 @@ from visualise import *
 import time
 
 
-curr_global_decoder = torch.load(f'results/class_based/MNIST_example/model4_curr_decoder')
+curr_global_decoder = torch.load(f'results/class_based/FashionMNIST_example_dirichlet/model0_curr_decoder')
 # print(curr_global_decoder.class_table)
 
 class_table = curr_global_decoder.class_table
@@ -30,7 +30,7 @@ n_prev_examples = 50
 recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = vae_utils.generate_previous_data(
     curr_global_decoder,
     class_table=class_table,
-    n_tasks=5,
+    n_tasks=1,
     n_img=n_prev_examples,
     num_local=batch_size,
     return_z=True,

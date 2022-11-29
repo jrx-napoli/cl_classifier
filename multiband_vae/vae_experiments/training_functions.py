@@ -303,6 +303,7 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
 
             out = feature_extractor(x)
             loss = criterion(out, y)
+            # feature_extractor.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -352,6 +353,7 @@ def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_
             out = head(extracted)
             out = out.squeeze(1)
             loss = criterion(out, y)
+            # head.zero_grad()
             acc = get_head_accuracy(out, y)
             
             loss.backward()

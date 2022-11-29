@@ -91,12 +91,8 @@ def run(args):
 
 
     # Prepare head
-    if args.binary_head:
-        head = classifier.BinaryHead(latent_size=args.gen_latent_size, d=args.gen_d, 
-                                     device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
-    else:
-        head = classifier.Head(latent_size=args.gen_latent_size, d=args.gen_d, 
-                                       device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
+    head = classifier.Head(latent_size=args.gen_latent_size, d=args.gen_d, 
+                            device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
     print(head)
     
 

@@ -115,7 +115,7 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
         if task_id == 0:
             n_head_epochs = args.head_epochs
         else:
-            n_head_epochs = args.head_epochs * 2
+            n_head_epochs = args.head_epochs
 
         current_head = training_functions.train_head(head=head, fe=feature_extractor, task_loader=current_head_training_dataloader, n_epochs=n_head_epochs)
         print("Done training classifier head\n")
