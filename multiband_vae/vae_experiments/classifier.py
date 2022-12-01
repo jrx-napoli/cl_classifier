@@ -22,18 +22,12 @@ class Head(nn.Module):
         self.in_size = in_size
         self.only_fc = fc
 
-        self.fc_0 = nn.Linear(self.d * latent_size, self.d * latent_size) # from size of translators output
         self.fc_1 = nn.Linear(self.d * latent_size, self.d * 4)
-        self.fc_2 = nn.Linear(self.d * 4, self.d * 2)
-        self.fc_3 = nn.Linear(self.d * 2, self.d)
-        self.fc_4 = nn.Linear(self.d, 10)
+        self.fc_2 = nn.Linear(self.d * 4, 10)
 
     def forward(self, x):
-        x = F.leaky_relu(self.fc_0(x))
         x = F.leaky_relu(self.fc_1(x))
-        x = F.leaky_relu(self.fc_2(x))
-        x = F.leaky_relu(self.fc_3(x))
-        x = self.fc_4(x)
+        x = self.fc_2(x)
         return x
 
 
@@ -70,15 +64,13 @@ class FeatureExtractor(nn.Module):
         else:
             if self.in_size == 28:
                 self.dropout = nn.Dropout(self.p)
-                self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.d, kernel_size=4, stride=2, padding=1, bias=False)
-                self.bn_1 = nn.BatchNorm2d(self.d)
-                self.conv2 = nn.Conv2d(self.d, self.d * 2, kernel_size=4, stride=2, padding=1, bias=False)
-                self.bn_2 = nn.BatchNorm2d(self.d * 2)
-                self.conv3 = nn.Conv2d(self.d *2, self.d * 4, kernel_size=4, stride=1, padding=1, bias=False)
-                self.bn_3 = nn.BatchNorm2d(self.d * 4)
-                
-                self.fc1 = nn.Linear(1152, self.d * 16)
-                self.fc2 = nn.Linear(self.d * 16, self.d * latent_size)
+                self.conv1 = nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1, padding=1, bias=True)
+                # self.bn_1 = nn.BatchNorm2d(self.d)
+                self.conv2 = nn.Conv2d(6, 16, kernel_size=5, stride=1, padding=1, bias=True)
+                # self.bn_2 = nn.BatchNorm2d(self.d * 2)
+                self.conv3 = nn.Conv2d(16, 120, kernel_size=5, stride=1, padding=1, bias=True)
+                # self.bn_3 = nn.BatchNorm2d(self.d * 4)                
+                self.fc1 = nn.Linear(1080, self.d * latent_size)
 
             elif self.in_size == 44:
                 self.conv_out_size = 2
@@ -127,39 +119,35 @@ class FeatureExtractor(nn.Module):
 
 
     def forward(self, x):
-        # with torch.no_grad():
-        #     if self.cond_n_dim_coding:
-        #         conds_coded = (conds * self.cond_p_coding) % (2 ** self.cond_n_dim_coding)
-        #         conds_coded = BitUnpacker.unpackbits(conds_coded, self.cond_n_dim_coding).to(self.device)
-        #         x = torch.cat([x, conds_coded], dim=1)
+
         if self.only_fc:
             x = x.view(x.size(0), -1)
             x = F.leaky_relu(self.fc_1(x))
             x = F.leaky_relu(self.fc_2(x))
             x = F.leaky_relu(self.fc_3(x))
         else:
-            x = self.conv1(x)
-            x = F.leaky_relu(self.bn_1(x))
-            x = self.dropout(x)
-            x = self.conv2(x)
-            x = F.leaky_relu(self.bn_2(x))
-            x = self.dropout(x)
-            x = self.conv3(x)
-            x = F.leaky_relu(self.bn_3(x))
-            x = self.dropout(x)
-            print(f'x: {x.size()}')
-            if self.in_size == 28:
-                x = x.view([-1, 1152])
-            else:
-                x = self.conv4(x)
-                x = F.leaky_relu(self.bn_4(x))
-                x = x.view([-1, self.d * 4 * self.conv_out_size * self.conv_out_size])
+            # x = self.conv1(x)
+            # x = F.leaky_relu(self.bn_1(x))
+            # x = self.conv2(x)
+            # x = F.leaky_relu(self.bn_2(x))
+            # x = self.conv3(x)
+            # x = F.leaky_relu(self.bn_3(x))
 
-            # if self.cond_n_dim_coding:
-            #     x = torch.cat([x, conds_coded], dim=1)
+            x = F.leaky_relu(self.conv1(x))
+            x = F.avg_pool2d(x, (2, 2))
+            x = F.leaky_relu(self.conv2(x))
+            x = F.avg_pool2d(x, (2, 2))
+            x = F.leaky_relu(self.conv3(x))
+
+            # print(f'x: {x.size()}')
+            
+            # flatten
+            if self.in_size == 28:
+                x = x.view([-1, 1080])
+            else:
+                pass
 
             x = F.leaky_relu(self.fc1(x))
-            x = F.leaky_relu(self.fc2(x))
 
         
         return x

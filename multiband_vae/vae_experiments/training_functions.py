@@ -286,7 +286,7 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
     print(f"feature extractor's lr set to: {lr}")
 
     criterion = nn.MSELoss(reduction="sum")
-    optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr / 10, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
     
     for epoch in range(n_epochs):
@@ -303,13 +303,13 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
 
             out = feature_extractor(x)
             loss = criterion(out, y)
-            # feature_extractor.zero_grad()
+
             loss.backward()
             optimizer.step()
 
-            losses.append(loss.item())
 
             with torch.no_grad():
+                losses.append(loss.item())
                 for i, output in enumerate(out):
                     cosine_distances.append((torch.cosine_similarity(output, y[i], dim=0)).item())
 
@@ -326,6 +326,7 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
 def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_rate=0.99):
     # n_epochs = 3
     wandb.watch(head)
+    fe.eval()
     head.train()
     lr = local_start_lr
     print(f"head's lr set to: {lr}")
@@ -351,17 +352,17 @@ def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_
                 extracted = fe(x)
 
             out = head(extracted)
-            out = out.squeeze(1)
             loss = criterion(out, y)
-            # head.zero_grad()
-            acc = get_head_accuracy(out, y)
             
             loss.backward()
             optimizer.step()
 
-            accuracy += acc.item()
-            total += len(y)
-            losses.append(loss.item())
+            with torch.no_grad():
+                acc = get_head_accuracy(out, y)
+                accuracy += acc.item()
+                total += len(y)
+                losses.append(loss.item())
+            
             wandb.log({"training_loss": (loss.item())})
 
         scheduler.step()
@@ -377,10 +378,4 @@ def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_
 def get_head_accuracy(y_pred, y_test):
     _, y_pred_tag = torch.max(y_pred, 1)
     correct_results_sum = (y_pred_tag == y_test).sum().float()
-    return correct_results_sum
-
-def get_binary_accuracy(y_pred, y_test):
-    y_pred_tag = torch.round(torch.sigmoid(y_pred))
-    correct_results_sum = (y_pred_tag == y_test).sum().float()
-    
     return correct_results_sum

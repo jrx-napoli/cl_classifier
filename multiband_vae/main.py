@@ -413,7 +413,7 @@ def get_args(argv):
                         help="Load Classifier Head")
     parser.add_argument('--feature_extractor_epochs', default=45, type=int,
                         help="Feature Extractor training epochs")
-    parser.add_argument('--head_epochs', default=5, type=int,
+    parser.add_argument('--head_epochs', default=10, type=int,
                         help="Head training epochs")
     parser.add_argument('--binary_head', default=False, action='store_true',
                         help="Enable binary head training")
