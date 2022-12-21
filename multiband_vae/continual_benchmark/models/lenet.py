@@ -28,19 +28,19 @@ class LeNet(nn.Module):
         x = self.conv1(x)
         x = self.bn_1(x)
         x = F.leaky_relu(x)
-        x = self.dropout_1(x)
+        # x = self.dropout_1(x)
         x = self.conv2(x)
         x = self.bn_2(x)
         x = F.leaky_relu(x)
-        x = self.dropout_2(x)
+        # x = self.dropout_2(x)
         x = self.conv3(x)
         x = self.bn_3(x)
         x = F.leaky_relu(x)
 
-        x = self.dropout_3(x)
+        # x = self.dropout_3(x)
         x = x.view([-1,self.d*4*self.conv_out_dim*self.conv_out_dim])
         x = F.leaky_relu(self.fc3(x))
-        x = self.dropout_4(x)
+        # x = self.dropout_4(x)
         return x
 
     def logits(self, x):

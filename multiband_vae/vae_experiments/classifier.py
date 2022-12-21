@@ -22,12 +22,18 @@ class Head(nn.Module):
         self.in_size = in_size
         self.only_fc = fc
 
-        self.fc_1 = nn.Linear(self.d * latent_size, self.d * 4)
-        self.fc_2 = nn.Linear(self.d * 4, 10)
+        # self.fc_1 = nn.Linear(self.d * latent_size, self.d * 8)
+        # self.fc_2 = nn.Linear(self.d * 8, self.d * 4)
+        # self.fc_3 = nn.Linear(self.d * 4, 10)
+
+        self.fc_1 = nn.Linear(100, 75)
+        self.fc_2 = nn.Linear(75, 50)
+        self.fc_3 = nn.Linear(50, 10)
 
     def forward(self, x):
         x = F.leaky_relu(self.fc_1(x))
-        x = self.fc_2(x)
+        x = F.leaky_relu(self.fc_2(x))
+        x = self.fc_3(x)
         return x
 
 
@@ -65,12 +71,21 @@ class FeatureExtractor(nn.Module):
             if self.in_size == 28:
                 self.dropout = nn.Dropout(self.p)
                 self.conv1 = nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1, padding=1, bias=True)
-                # self.bn_1 = nn.BatchNorm2d(self.d)
                 self.conv2 = nn.Conv2d(6, 16, kernel_size=5, stride=1, padding=1, bias=True)
-                # self.bn_2 = nn.BatchNorm2d(self.d * 2)
                 self.conv3 = nn.Conv2d(16, 120, kernel_size=5, stride=1, padding=1, bias=True)
-                # self.bn_3 = nn.BatchNorm2d(self.d * 4)                
-                self.fc1 = nn.Linear(1080, self.d * latent_size)
+                self.fc1 = nn.Linear(1080, 728)
+                self.fc2 = nn.Linear(728, 512)
+                self.fc3 = nn.Linear(512, 100)
+
+                # self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.d, kernel_size=4, stride=2, padding=1, bias=False)
+                # self.bn_1 = nn.BatchNorm2d(self.d)
+                # self.conv2 = nn.Conv2d(self.d, self.d * 2, kernel_size=4, stride=2, padding=1, bias=False)
+                # self.bn_2 = nn.BatchNorm2d(self.d * 2)
+                # self.conv3 = nn.Conv2d(self.d * 2, self.d * 2, kernel_size=4, stride=2, padding=1, bias=False)
+                # self.bn_3 = nn.BatchNorm2d(self.d * 2)
+                # self.fc1 = nn.Linear(self.d * 9 * 2, self.d * 9 * 2)
+                # self.fc2 = nn.Linear(self.d * 9 * 2, self.d * latent_size)
+
 
             elif self.in_size == 44:
                 self.conv_out_size = 2
@@ -148,6 +163,7 @@ class FeatureExtractor(nn.Module):
                 pass
 
             x = F.leaky_relu(self.fc1(x))
-
+            x = F.leaky_relu(self.fc2(x))
+            x = F.leaky_relu(self.fc3(x))
         
         return x

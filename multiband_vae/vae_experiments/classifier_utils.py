@@ -292,6 +292,24 @@ class ClassifierValidator:
 
         return correct, total
 
+    def validate_global_benchamrk(self, test_model, data_loader):
+        total = 0
+        correct = 0
+
+        with torch.no_grad():
+            for iteration, batch in enumerate(data_loader):
+
+                x = batch[0].to("cuda")
+                y = batch[1].to("cuda")
+
+                out = test_model(x)
+                correct_sum = self.get_correct_sum(out, y)
+                
+                correct += correct_sum.item()
+                total += y.shape[0]
+
+        return correct, total
+
     def get_correct_sum(self, y_pred, y_test):
         _, y_pred_tag = torch.max(y_pred, 1)
         correct_results_sum = (y_pred_tag == y_test).sum().float()
