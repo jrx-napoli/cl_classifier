@@ -47,7 +47,8 @@ def CelebA(root, skip_normalization=False, train_aug=False, image_size=64, targe
 
 
 def MNIST(dataroot, skip_normalization=False, train_aug=False):
-    normalize = transforms.Normalize(mean=(0.1307,), std=(0.3081,))  # for 28x28
+    # normalize = transforms.Normalize(mean=(0.1307,), std=(0.3081,))  # for 28x28
+    normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for GAN 28x28
     # normalize = transforms.Normalize(mean=(0.1000,), std=(0.2752,))  # for 32x32
 
     if skip_normalization:

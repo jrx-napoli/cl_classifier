@@ -83,21 +83,18 @@ def run(args):
             x[i].append(task)
 
 
-    # Prepare feature extractor
-    feature_extractor = classifier.FeatureExtractor(latent_size=args.gen_latent_size, d=args.gen_d, cond_dim=n_classes, 
-                                                    cond_p_coding=args.gen_cond_p_coding, cond_n_dim_coding=args.gen_cond_n_dim_coding, 
-                                                    device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)    
-    print(feature_extractor)
+    if args.training_procedure == "classifier":
+        # Prepare feature extractor
+        feature_extractor = classifier.FeatureExtractor(latent_size=args.gen_latent_size, d=args.gen_d, cond_dim=n_classes, 
+                                                        cond_p_coding=args.gen_cond_p_coding, cond_n_dim_coding=args.gen_cond_n_dim_coding, 
+                                                        device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)    
+        print(feature_extractor)
 
 
-    # Prepare head
-    if args.binary_head:
-        head = classifier.BinaryHead(latent_size=args.gen_latent_size, d=args.gen_d, 
-                                     device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
-    else:
+        # Prepare head
         head = classifier.Head(latent_size=args.gen_latent_size, d=args.gen_d, 
-                                       device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
-    print(head)
+                                device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
+        print(head)
     
 
     # Prepare VAE
@@ -135,6 +132,17 @@ def run(args):
 
     global_eval_dataloaders = get_global_eval_dataloaders()
 
+
+
+    # Calculate global accuracy for current task
+    # lenet = torch.load(f"results/class_based/FashionMNIST_example/lenet_gloabl")
+    # print("lenet")
+    # print(lenet)
+    # cv = classifier_utils.ClassifierValidator()
+    # correct, total = cv.validate_global_benchamrk(test_model=lenet, data_loader=global_eval_dataloaders[-1]) # set correct dataloader
+    # acc = np.round(100 * correct/total, 3)
+    # print(f'Global accuracy: {acc} %')
+    # # return acc
 
     train_loaders = []
     train_loaders_big = []
@@ -389,7 +397,7 @@ def get_args(argv):
     parser.add_argument('--gen_ae_epochs', type=int, default=70,
                         help="Number of epochs to train local variational autoencoder")
     parser.add_argument('--global_dec_epochs', type=int, default=140, help="Number of epochs to train global decoder")
-    parser.add_argument('--gen_load_pretrained_models', default=True, action='store_true', # altered
+    parser.add_argument('--gen_load_pretrained_models', default=True, action='store_true', # 
                         help="Load pretrained generative models")
     parser.add_argument('--gen_pretrained_models_dir', type=str, default="results/MNIST_example/",
                         help="Directory of pretrained generative models")
@@ -415,9 +423,9 @@ def get_args(argv):
                         help="Load Feature Extractor")
     parser.add_argument('--gen_load_head', default=False, action='store_true',
                         help="Load Classifier Head")
-    parser.add_argument('--feature_extractor_epochs', default=45, type=int,
+    parser.add_argument('--feature_extractor_epochs', default=10, type=int,
                         help="Feature Extractor training epochs")
-    parser.add_argument('--head_epochs', default=5, type=int,
+    parser.add_argument('--head_epochs', default=4, type=int,
                         help="Head training epochs")
     parser.add_argument('--binary_head', default=False, action='store_true',
                         help="Enable binary head training")

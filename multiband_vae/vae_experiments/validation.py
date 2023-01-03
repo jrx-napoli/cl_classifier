@@ -38,9 +38,9 @@ class Validator:
             block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[self.dims]
             model = InceptionV3([block_idx])
             if score_model_device:
-                model = model.to(score_model_device)
+                model = model.to("cpu") # :)
             model.eval()
-            self.score_model_func = lambda batch: model(batch)[0]
+            self.score_model_func = lambda batch: model(batch.to("cpu"))[0] # :)
         self.stats_file_name = f"{stats_file_name}_dims_{self.dims}"
 
     def calculate_results(self, curr_global_decoder, class_table, task_id, translate_noise=True, starting_point=None,

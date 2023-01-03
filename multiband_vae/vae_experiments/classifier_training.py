@@ -37,14 +37,14 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
     if not task_id:
         # First task, initializing global decoder as local_vae's decoder
         if args.gen_load_pretrained_models:
-            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/test/{args.experiment_name}/model{task_id}_curr_global_generator', map_location="cuda").to(device).eval()
             print(f'Loaded global decoder')
         else:
             curr_global_decoder = copy.deepcopy(local_vae.decoder)
     else:
         # Retraining global decoder with previous global decoder and new data
         if args.gen_load_pretrained_models:
-            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/test/{args.experiment_name}/model{task_id}_curr_global_generator', map_location="cuda").to(device).eval()
             print(f'Loaded global decoder')
         else:
             print("\nTrain global decoder")
@@ -73,25 +73,20 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
 
 
     # Classifier training
-    class_table = curr_global_decoder.class_table
+    # class_table = curr_global_decoder.class_table
     if args.gen_load_feature_extractor:
         feature_extractor = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
-        replay_img_dataset = classifier_utils.FeatureExtractorDataset( 
-                                datasets=None,
-                                encoder=local_vae.encoder, 
-                                translator=curr_global_decoder.translator, 
-                                decoder=curr_global_decoder,
-                                task_id=task_id, 
-                                class_table=class_table,
-                                latent_size=local_vae.latent_size,
-                                gen_batch_size=args.gen_batch_size)
-        train_replay_dataset_loader = data.DataLoader(dataset=replay_img_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=False)
         feature_extractor = training_functions.train_feature_extractor(feature_extractor=feature_extractor,
-                                                                       task_loader=train_replay_dataset_loader,
-                                                                       n_epochs=args.feature_extractor_epochs)
+                                                                       task_loader=train_dataset_loader,
+                                                                       n_epochs=args.feature_extractor_epochs,
+                                                                       local_vae=local_vae,
+                                                                       decoder=curr_global_decoder,
+                                                                       class_table=None,
+                                                                       task_id=task_id,
+                                                                       batch_size=args.gen_batch_size)
         print("Done training feature extractor\n")
 
 
@@ -100,24 +95,21 @@ def train_classifier(args, models_definition, local_vae, curr_global_decoder, fe
         print("Loaded head")
     else:
         print("\nTrain classifier head")
-        current_head_training_dataset = classifier_utils.HeadDataset(
-                                                    datasets=None,
-                                                    encoder=local_vae.encoder, 
-                                                    decoder=curr_global_decoder,
-                                                    task_id=task_id, 
-                                                    class_table=class_table,
-                                                    binary_head = binary_head,
-                                                    gen_batch_size=args.gen_batch_size,
-                                                    gen_samples_only = True,
-                                                    global_benchmark=global_benchmark)
-        current_head_training_dataloader = data.DataLoader(dataset=current_head_training_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=False)
 
         if task_id == 0:
             n_head_epochs = args.head_epochs
         else:
-            n_head_epochs = args.head_epochs * 2
+            n_head_epochs = args.head_epochs
 
-        current_head = training_functions.train_head(head=head, fe=feature_extractor, task_loader=current_head_training_dataloader, n_epochs=n_head_epochs)
+        current_head = training_functions.train_head(head=head, 
+                                                     fe=feature_extractor, 
+                                                     local_vae=local_vae,
+                                                     task_loader=train_dataset_loader, 
+                                                     n_epochs=n_head_epochs,
+                                                     decoder=curr_global_decoder,
+                                                     class_table=None,
+                                                     task_id=task_id,
+                                                     batch_size=args.gen_batch_size)
         print("Done training classifier head\n")
 
     torch.cuda.empty_cache()

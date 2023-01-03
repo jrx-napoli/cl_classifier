@@ -10,6 +10,7 @@ from torch.distributions.utils import logits_to_probs
 from vae_experiments.lap_loss import LapLoss
 from vae_experiments.latent_visualise import Visualizer
 from vae_experiments.vae_utils import *
+import gan_experiments.gan_utils
 import copy
 import wandb
 
@@ -201,7 +202,7 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
                 return_z=True,
                 translate_noise=True,
                 same_z=train_same_z,
-                equal_split=True)
+                equal_split=False)
 
             if train_same_z:
                 z_prev, z_max = z_prev
@@ -226,6 +227,7 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
             task_ids_concat = torch.cat([classes_prev, task_ids_local])
 
             class_concat = torch.cat([classes_prev, sampled_classes_local.view(-1)])
+
             if epoch > warmup_rounds:  # Warm-up epochs within which we don't switch targets
                 with torch.no_grad():
                     current_noise_translated = global_decoder.translator(z_current_compare, task_ids_current_compare)
@@ -278,15 +280,18 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
                     f"Epoch: {epoch} - changing from batches: {[(idx, n_changes) for idx, n_changes in enumerate(sum_changed.tolist())]}")
     return global_decoder
 
-def train_feature_extractor(feature_extractor, task_loader, n_epochs,
-                            local_start_lr=0.001, scheduler_rate=0.99):
+def train_feature_extractor(feature_extractor, task_loader, n_epochs, local_vae, decoder, class_table, task_id, batch_size,
+                            train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
     # n_epochs = 1
+    wandb.watch(feature_extractor)
     feature_extractor.train()
+    decoder.translator.eval()
+    n_iterations = 100
     lr = local_start_lr
     print(f"feature extractor's lr set to: {lr}")
 
     criterion = nn.MSELoss(reduction="sum")
-    optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr / 10, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
     
     for epoch in range(n_epochs):
@@ -294,25 +299,70 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
         cosine_distances = []
         start = time.time()
 
-        for iteration, batch in enumerate(task_loader):
+        for iteration in range(n_iterations):
 
-            x = batch[0].to(feature_extractor.device)
-            y = batch[1]
-
-            optimizer.zero_grad()
-
-            out = feature_extractor(x)
-            loss = criterion(out, y)
-            loss.backward()
-            optimizer.step()
-
-            losses.append(loss.item())
-
+            # dataset from current task
             with torch.no_grad():
-                for i, output in enumerate(out):
-                    cosine_distances.append((torch.cosine_similarity(output, y[i], dim=0)).item())
+                limit_previous_examples = 1
+                n_prev_examples = int(batch_size * min(task_id + 1, 3) * limit_previous_examples)
+                # n_prev_examples = batch_size
+                # recon_local, classes_local, z_local, task_ids_local, embeddings_local = generate_previous_data(
+                #     decoder,
+                #     class_table=class_table,
+                #     n_tasks=task_id + 1,
+                #     n_img=n_prev_examples,
+                #     num_local=batch_size,
+                #     return_z=True,
+                #     translate_noise=True,
+                #     same_z=train_same_z,
+                #     equal_split=True,
+                #     recent_task_only=False) # recent task only 
+
+                # if train_same_z:
+                #     z_local, z_max = z_local
+                # else:
+                #     z_local = z_local
+
+                generations, random_noise, task_ids = gan_experiments.gan_utils.generate_previous_data(
+                    n_prev_tasks=2*(task_id + 1),
+                    n_prev_examples=n_prev_examples,
+                    curr_global_generator=decoder)
+
+
+            generations = generations.to("cuda")
+            random_noise = random_noise.to("cuda")
+            task_ids = task_ids.to("cuda")
+
+            # shuffle
+            n_mini_batches = math.ceil(len(random_noise) / batch_size)
+            shuffle = torch.randperm(len(random_noise))
+            generations = generations[shuffle]
+            task_ids = task_ids[shuffle]
+            random_noise = random_noise[shuffle]
+
+
+            for batch_id in range(n_mini_batches):
+                start_point = batch_id * batch_size
+                end_point = min(len(random_noise), (batch_id + 1) * batch_size)
+
+                with torch.no_grad():
+                    translated_z = decoder.translator(random_noise[start_point:end_point], task_ids[start_point:end_point])
+
+                optimizer.zero_grad()
+
+                out = feature_extractor(generations[start_point:end_point])
+                loss = criterion(out, translated_z)
+
+                loss.backward()
+                optimizer.step()
+
+                with torch.no_grad():
+                    losses.append(loss.item())
+                    for i, output in enumerate(out):
+                        cosine_distances.append((torch.cosine_similarity(output, translated_z[i], dim=0)).item())
 
         scheduler.step()
+
         if epoch % 1 == 0:
             print("Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(epoch, n_epochs,
                                                                                 np.round(np.mean(losses), 3),
@@ -322,11 +372,15 @@ def train_feature_extractor(feature_extractor, task_loader, n_epochs,
     return feature_extractor
 
 
-def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_rate=0.99):
-    # n_epochs = 3
+def train_head(head, task_loader, fe, local_vae, n_epochs, decoder, class_table, task_id, batch_size, 
+               train_same_z=True, local_start_lr=0.001, scheduler_rate=0.99):
+    # n_epochs = 2
     wandb.watch(head)
+    fe.eval()
+    decoder.translator.eval()
     head.train()
     lr = local_start_lr
+    n_iterations = 400
     print(f"head's lr set to: {lr}")
 
     optimizer = torch.optim.Adam(list(head.parameters()), lr=lr, weight_decay=1e-5)
@@ -339,30 +393,66 @@ def train_head(head, task_loader, fe, n_epochs, local_start_lr=0.001, scheduler_
         total = 0
         start = time.time()
 
-        for iteration, batch in enumerate(task_loader):
+        for iteration in range(n_iterations):
 
-            x = batch[0].to(head.device)
-            y = batch[1].to(head.device)
-
-            optimizer.zero_grad()
-
-            with torch.no_grad():
-                extracted = fe(x)
-
-            out = head(extracted)
-            out = out.squeeze(1)
-            loss = criterion(out, y)
-            acc = get_head_accuracy(out, y)
+            # Build dataset from global model
+            limit_previous_examples = 1
+            n_prev_examples = int(batch_size * min(task_id + 1, 3) * limit_previous_examples)
+            # recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = generate_previous_data(
+            #     decoder,
+            #     class_table=class_table,
+            #     n_tasks=task_id + 1, # prev tasks only
+            #     n_img=n_prev_examples,
+            #     num_local=batch_size,
+            #     return_z=True,
+            #     translate_noise=True,
+            #     same_z=train_same_z,
+            #     equal_split=True,
+            #     recent_task_only=False)
             
-            loss.backward()
-            optimizer.step()
+            # if train_same_z:
+            #     z_prev, z_max = z_prev
+            # else:
+            #     z_prev = z_prev
+            
+            generations, random_noise, task_ids = gan_experiments.gan_utils.generate_previous_data(
+                n_prev_tasks=2*(task_id + 1),
+                n_prev_examples=n_prev_examples,
+                curr_global_generator=decoder)
 
-            accuracy += acc.item()
-            total += len(y)
-            losses.append(loss.item())
-            wandb.log({"training_loss": (loss.item())})
+            task_ids = task_ids.long()
+
+
+            # shuffle
+            n_mini_batches = math.ceil(len(random_noise) / batch_size)
+            shuffle = torch.randperm(len(random_noise))
+            generations = generations[shuffle]
+            task_ids = task_ids[shuffle]
+            random_noise = random_noise[shuffle]
+
+            for batch_id in range(n_mini_batches):
+                start_point = batch_id * batch_size
+                end_point = min(len(random_noise), (batch_id + 1) * batch_size)
+
+                with torch.no_grad():
+                    translated_z = decoder.translator(random_noise[start_point:end_point], task_ids[start_point:end_point])
+                
+                optimizer.zero_grad()
+
+                out = head(translated_z)
+                loss = criterion(out, task_ids[start_point:end_point].to(head.device))
+
+                loss.backward()
+                optimizer.step()
+
+                with torch.no_grad():
+                    acc = get_head_accuracy(out, task_ids[start_point:end_point].to(head.device))
+                    accuracy += acc.item()
+                    total += len(task_ids[start_point:end_point])
+                    losses.append(loss.item())
 
         scheduler.step()
+
         if epoch % 1 == 0:
             print("Epoch: {}/{}, loss: {}, Acc: {} %, took: {} s".format(epoch, n_epochs,
                                                                 np.round(np.mean(losses), 3),
@@ -377,8 +467,18 @@ def get_head_accuracy(y_pred, y_test):
     correct_results_sum = (y_pred_tag == y_test).sum().float()
     return correct_results_sum
 
-def get_binary_accuracy(y_pred, y_test):
-    y_pred_tag = torch.round(torch.sigmoid(y_pred))
-    correct_results_sum = (y_pred_tag == y_test).sum().float()
-    
-    return correct_results_sum
+
+# # Build dataset from global model
+# limit_previous_examples = 1
+# n_prev_examples = int(batch_size * min(task_id, 3) * limit_previous_examples)
+# recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = generate_previous_data(
+#     decoder,
+#     class_table=class_table,
+#     n_tasks=task_id, # prev tasks only
+#     n_img=n_prev_examples,
+#     num_local=batch_size,
+#     return_z=True,
+#     translate_noise=True,
+#     same_z=train_same_z,
+#     equal_split=True,
+#     recent_task_only=False)
