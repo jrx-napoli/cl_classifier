@@ -9,7 +9,7 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
 
     if args.gen_load_pretrained_models:
         # local_vae=torch.load(args.gen_pretrained_models_dir + f'model{task_id}_local_vae').to(device)
-        local_vae=torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_local_vae').to(device)
+        local_vae=torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_local_vae').to(device)
         print(f'Loaded local VAE')
     else:
         if task_id == 0:
@@ -36,7 +36,7 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
     if not task_id:
         # First task, initializing global decoder as local_vae's decoder
         if args.gen_load_pretrained_models:
-            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
             print(f'Loaded global decoder')
         else:
             curr_global_decoder = copy.deepcopy(local_vae.decoder)
@@ -44,7 +44,7 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
         # Retraining global decoder with previous global decoder and new data
         if args.gen_load_pretrained_models:
             # curr_global_decoder = torch.load(args.gen_pretrained_models_dir + f'model{task_id}_curr_decoder').to(device)
-            curr_global_decoder = torch.load(f'results/class_based/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+            curr_global_decoder = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
             print(f'Loaded global decoder')
         else:
             print("Train global VAE model")
