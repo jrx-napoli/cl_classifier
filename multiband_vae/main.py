@@ -199,13 +199,13 @@ def run(args):
 
         # save feature extractor and classifier
         if args.training_procedure == "classifier":
-            torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
-            torch.save(classifier, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
+            # torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
+            # torch.save(classifier, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 
             cv = classifier_utils.ClassifierValidator()
 
             # Calculate global accuracy for current task
-            correct, total = cv.validate_classifier(fe=feature_extractor, 
+            correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
                                                     classifier=classifier, 
                                                     data_loader=global_eval_dataloaders[task_id])             
             acc = np.round(100 * correct/total, 3)

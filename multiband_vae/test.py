@@ -138,12 +138,12 @@ from continual_benchmark import models
 
 # torch.save(model, f"results/class_based/FashionMNIST_example/lenet_gloabl")
 
-curr_global_decoder = torch.load('results/vae/Omniglot_example/model0_curr_decoder')
+curr_global_decoder = torch.load('results/vae/Omniglot_example/model4_curr_decoder')
 batch_size = 32
 n_prev_examples = 50
 recon_prev, classes_prev, z_prev, embeddings_prev = vae_utils.generate_previous_data(
     curr_global_decoder,
-    n_tasks=1,
+    n_tasks=5,
     n_img=n_prev_examples,
     num_local=batch_size,
     return_z=True,

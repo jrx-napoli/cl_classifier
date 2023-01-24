@@ -22,13 +22,13 @@ class Head(nn.Module):
         self.in_size = in_size
         self.only_fc = fc
 
-        # self.fc_1 = nn.Linear(self.d * latent_size, self.d * 8)
-        # self.fc_2 = nn.Linear(self.d * 8, self.d * 4)
-        # self.fc_3 = nn.Linear(self.d * 4, 10)
+        self.fc_1 = nn.Linear(self.d * latent_size, self.d * 8)
+        self.fc_2 = nn.Linear(self.d * 8, self.d * 4)
+        self.fc_3 = nn.Linear(self.d * 4, 10)
 
-        self.fc_1 = nn.Linear(100, 75)
-        self.fc_2 = nn.Linear(75, 50)
-        self.fc_3 = nn.Linear(50, 10)
+        # self.fc_1 = nn.Linear(100, 75)
+        # self.fc_2 = nn.Linear(75, 50)
+        # self.fc_3 = nn.Linear(50, 10)
 
     def forward(self, x):
         x = F.leaky_relu(self.fc_1(x))

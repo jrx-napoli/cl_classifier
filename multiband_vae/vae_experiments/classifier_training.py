@@ -23,7 +23,8 @@ def train_classifier(args, feature_extractor, classifier, task_id, device):
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
-        feature_extractor = training_functions.train_feature_extractor(feature_extractor=feature_extractor,
+        feature_extractor = training_functions.train_feature_extractor(args=args,
+                                                                       feature_extractor=feature_extractor,
                                                                        n_epochs=args.feature_extractor_epochs,
                                                                        decoder=generator,
                                                                        task_id=task_id,
@@ -31,13 +32,14 @@ def train_classifier(args, feature_extractor, classifier, task_id, device):
         print("Done training feature extractor\n")
 
 
-    if args.gen_load_head:
+    if args.gen_load_classifier:
         classifier = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_head').to(device)
         print("Loaded head")
     else:
         print("\nTrain classifier head")
-        classifier = training_functions.train_head(head=classifier, 
-                                                    n_epochs=args.head_epochs,
+        classifier = training_functions.train_head(args=args,
+                                                    classifier=classifier, 
+                                                    n_epochs=args.classifier_epochs,
                                                     decoder=generator,
                                                     task_id=task_id,
                                                     batch_size=args.gen_batch_size)

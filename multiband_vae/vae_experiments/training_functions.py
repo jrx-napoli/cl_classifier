@@ -274,9 +274,9 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
                     f"Epoch: {epoch} - changing from batches: {[(idx, n_changes) for idx, n_changes in enumerate(sum_changed.tolist())]}")
     return global_decoder
 
-def train_feature_extractor(feature_extractor, n_epochs, decoder, task_id, batch_size,
+def train_feature_extractor(args, feature_extractor, n_epochs, decoder, task_id, batch_size,
                             train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
-    # n_epochs = 1
+    n_epochs = 1
     wandb.watch(feature_extractor)
     feature_extractor.train()
     decoder.translator.eval()
@@ -297,44 +297,34 @@ def train_feature_extractor(feature_extractor, n_epochs, decoder, task_id, batch
 
         for iteration in range(n_iterations):
 
-            # dataset from current task
             with torch.no_grad():
                 limit_previous_examples = 1
                 n_prev_examples = int(batch_size * min(task_id + 1, 3) * limit_previous_examples)
                 
-                # n_prev_examples = batch_size
-                # recon_local, classes_local, z_local, task_ids_local, embeddings_local = generate_previous_data(
-                #     decoder,
-                #     class_table=class_table,
-                #     n_tasks=task_id + 1,
-                #     n_img=n_prev_examples,
-                #     num_local=batch_size,
-                #     return_z=True,
-                #     translate_noise=True,
-                #     same_z=train_same_z,
-                #     equal_split=True,
-                #     recent_task_only=False) # recent task only 
+                if args.generator_type == "vae":
+                    generations, classes, random_noise, _ = generate_previous_data(
+                        decoder,
+                        n_tasks=task_id + 1,
+                        n_img=n_prev_examples,
+                        num_local=batch_size,
+                        return_z=True,
+                        translate_noise=True,
+                        same_z=train_same_z)
 
-                # if train_same_z:
-                #     z_local, z_max = z_local
-                # else:
-                #     z_local = z_local
-
-                generations, random_noise, task_ids = gan_experiments.gan_utils.generate_previous_data(
-                    n_prev_tasks=2*(task_id + 1),
-                    n_prev_examples=n_prev_examples,
-                    curr_global_generator=decoder)
-
+                elif args.generator_type == "gan":
+                    generations, random_noise, classes = gan_experiments.gan_utils.generate_previous_data(
+                        n_prev_tasks=2*(task_id + 1),
+                        n_prev_examples=n_prev_examples,
+                        curr_global_generator=decoder)
 
             generations = generations.to("cuda")
             random_noise = random_noise.to("cuda")
-            task_ids = task_ids.to("cuda")
 
             # shuffle
             n_mini_batches = math.ceil(len(random_noise) / batch_size)
             shuffle = torch.randperm(len(random_noise))
             generations = generations[shuffle]
-            task_ids = task_ids[shuffle]
+            classes = classes[shuffle]
             random_noise = random_noise[shuffle]
 
 
@@ -343,7 +333,7 @@ def train_feature_extractor(feature_extractor, n_epochs, decoder, task_id, batch
                 end_point = min(len(random_noise), (batch_id + 1) * batch_size)
 
                 with torch.no_grad():
-                    translated_z = decoder.translator(random_noise[start_point:end_point], task_ids[start_point:end_point])
+                    translated_z = decoder.translator(random_noise[start_point:end_point], classes[start_point:end_point])
 
                 optimizer.zero_grad()
 
@@ -369,9 +359,9 @@ def train_feature_extractor(feature_extractor, n_epochs, decoder, task_id, batch
     return feature_extractor
 
 
-def train_head(classifier, n_epochs, decoder, task_id, batch_size, 
+def train_head(args, classifier, n_epochs, decoder, task_id, batch_size, 
                train_same_z=True, local_start_lr=0.001, scheduler_rate=0.99):
-    # n_epochs = 2
+    n_epochs = 1
     wandb.watch(classifier)
     decoder.translator.eval()
     decoder.eval()
@@ -393,40 +383,33 @@ def train_head(classifier, n_epochs, decoder, task_id, batch_size,
 
         for iteration in range(n_iterations):
 
-            # Build dataset from global model
             limit_previous_examples = 1
             n_prev_examples = int(batch_size * min(task_id + 1, 3) * limit_previous_examples)
 
-            # recon_prev, classes_prev, z_prev, task_ids_prev, embeddings_prev = generate_previous_data(
-            #     decoder,
-            #     class_table=class_table,
-            #     n_tasks=task_id + 1, # prev tasks only
-            #     n_img=n_prev_examples,
-            #     num_local=batch_size,
-            #     return_z=True,
-            #     translate_noise=True,
-            #     same_z=train_same_z,
-            #     equal_split=True,
-            #     recent_task_only=False)
-            
-            # if train_same_z:
-            #     z_prev, z_max = z_prev
-            # else:
-            #     z_prev = z_prev
-            
-            generations, random_noise, task_ids = gan_experiments.gan_utils.generate_previous_data(
-                n_prev_tasks=2*(task_id + 1),
-                n_prev_examples=n_prev_examples,
-                curr_global_generator=decoder)
+            if args.generator_type == "vae":
+                generations, classes, random_noise, _ = generate_previous_data(
+                    decoder,
+                    n_tasks=task_id + 1,
+                    n_img=n_prev_examples,
+                    num_local=batch_size,
+                    return_z=True,
+                    translate_noise=True,
+                    same_z=train_same_z)
 
-            task_ids = task_ids.long()
+            elif args.generator_type == "gan":
+                generations, random_noise, classes = gan_experiments.gan_utils.generate_previous_data(
+                    n_prev_tasks=2*(task_id + 1),
+                    n_prev_examples=n_prev_examples,
+                    curr_global_generator=decoder)
+
+            classes = classes.long()
 
 
             # shuffle
             n_mini_batches = math.ceil(len(random_noise) / batch_size)
             shuffle = torch.randperm(len(random_noise))
             generations = generations[shuffle]
-            task_ids = task_ids[shuffle]
+            classes = classes[shuffle]
             random_noise = random_noise[shuffle]
 
             for batch_id in range(n_mini_batches):
@@ -434,20 +417,20 @@ def train_head(classifier, n_epochs, decoder, task_id, batch_size,
                 end_point = min(len(random_noise), (batch_id + 1) * batch_size)
 
                 with torch.no_grad():
-                    translated_z = decoder.translator(random_noise[start_point:end_point], task_ids[start_point:end_point])
+                    translated_z = decoder.translator(random_noise[start_point:end_point], classes[start_point:end_point])
                 
                 optimizer.zero_grad()
 
                 out = classifier(translated_z)
-                loss = criterion(out, task_ids[start_point:end_point].to(classifier.device))
+                loss = criterion(out, classes[start_point:end_point].to(classifier.device))
 
                 loss.backward()
                 optimizer.step()
 
                 with torch.no_grad():
-                    acc = get_classifier_accuracy(out, task_ids[start_point:end_point].to(classifier.device))
+                    acc = get_classifier_accuracy(out, classes[start_point:end_point].to(classifier.device))
                     accuracy += acc.item()
-                    total += len(task_ids[start_point:end_point])
+                    total += len(classes[start_point:end_point])
                     losses.append(loss.item())
 
         scheduler.step()
