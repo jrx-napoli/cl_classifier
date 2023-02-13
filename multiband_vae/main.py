@@ -11,11 +11,12 @@ import matplotlib.pyplot as plt
 import continual_benchmark.dataloaders.base
 import continual_benchmark.dataloaders as dataloaders
 from continual_benchmark.dataloaders.datasetGen import data_split
-from vae_experiments import classifier_utils
+from vae_experiments import classifier_utils, resnet
 from vae_experiments import multiband_training, classifier_training, replay_training, training_functions
 from vae_experiments import vae_utils
 from vae_experiments.validation import Validator, CERN_Validator
 from vae_experiments import models_definition, classifier_models
+import global_classifier_training
 from visualise import *
 import wandb
 
@@ -72,14 +73,15 @@ def run(args):
 
     if args.training_procedure == "classifier":
         # Prepare classifier models
-        feature_extractor = classifier_models.FeatureExtractor(latent_size=args.gen_latent_size, 
+        feature_extractor = classifier_models.FeatureExtractor(latent_size=args.gen_latent_size,
                                                                 d=args.gen_d, 
                                                                 cond_dim=n_classes, 
                                                                 cond_p_coding=args.gen_cond_p_coding, 
                                                                 cond_n_dim_coding=args.gen_cond_n_dim_coding, 
                                                                 device=device, 
                                                                 in_size=train_dataset[0][0].size()[1], 
-                                                                fc=args.fc).to(device)    
+                                                                fc=args.fc).to(device)
+        # feature_extractor = resnet.ResNet18S(out_dim=args.gen_d * args.gen_latent_size).to(device)
         print(feature_extractor)
 
         classifier = classifier_models.Head(latent_size=args.gen_latent_size, 
@@ -103,6 +105,18 @@ def run(args):
                                                                                 val_dataset_splits=val_dataset_splits, 
                                                                                 args=args)
 
+        # test calssifier's architecture
+        if args.global_benchmark:
+            feature_extractor_copy = copy.deepcopy(feature_extractor)
+            classifier_copy = copy.deepcopy(classifier)
+            global_classifier_training.test_architecture(feature_extractor=feature_extractor_copy,
+                                                            classifier=classifier_copy,
+                                                            train_dataset_splits=train_dataset_splits,
+                                                            val_dataset_splits=val_dataset_splits,
+                                                            device=device)
+            return
+
+
     elif args.training_procedure == "multiband":
         # Prepare VAE
         local_vae = models_definition.VAE(latent_size=args.gen_latent_size, 
@@ -119,7 +133,6 @@ def run(args):
 
     translate_noise = True
     class_table = torch.zeros(n_tasks, n_classes, dtype=torch.long)
-
 
     train_loaders = []
     train_loaders_big = []
@@ -199,8 +212,8 @@ def run(args):
 
         # save feature extractor and classifier
         if args.training_procedure == "classifier":
-            # torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
-            # torch.save(classifier, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
+            torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
+            torch.save(classifier, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 
             cv = classifier_utils.ClassifierValidator()
 
@@ -274,19 +287,24 @@ def run(args):
                                                                             dataset=args.dataset)
                 fid_local_vae[task_id] = fid_result
                 print(f"FID local VAE: {fid_result}")
-            for j in range(task_id + 1):
-                val_name = task_names[j]
-                print('validation split name:', val_name)
-                fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
-                                                                            class_table=curr_global_decoder.class_table,
-                                                                            task_id=j,
-                                                                            translate_noise=translate_noise,
-                                                                            dataset=args.dataset)  # task_id != 0)
-                fid_table[j][task_name] = fid_result
-                precision_table[j][task_name] = precision
-                recall_table[j][task_name] = recall
-                print(f"FID task {j}: {fid_result}")
-        local_vae.decoder = copy.deepcopy(curr_global_decoder)
+    
+            if (args.training_procedure == "multiband"):
+                for j in range(task_id + 1):
+                    val_name = task_names[j]
+                    print('validation split name:', val_name)
+                    fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
+                                                                                class_table=curr_global_decoder.class_table,
+                                                                                task_id=j,
+                                                                                translate_noise=translate_noise,
+                                                                                dataset=args.dataset)  # task_id != 0)
+                    fid_table[j][task_name] = fid_result
+                    precision_table[j][task_name] = precision
+                    recall_table[j][task_name] = recall
+                    print(f"FID task {j}: {fid_result}")
+                
+        if (args.training_procedure == "multiband"):
+            local_vae.decoder = copy.deepcopy(curr_global_decoder)
+    
     return fid_table, task_names, test_fid_table, precision_table, recall_table, fid_local_vae
 
 
@@ -388,9 +406,9 @@ def get_args(argv):
                         help="Load Feature Extractor")
     parser.add_argument('--gen_load_classifier', default=False, action='store_true',
                         help="Load Classifier")
-    parser.add_argument('--feature_extractor_epochs', default=45, type=int,
+    parser.add_argument('--feature_extractor_epochs', default=20, type=int,
                         help="Feature Extractor training epochs")
-    parser.add_argument('--classifier_epochs', default=4, type=int,
+    parser.add_argument('--classifier_epochs', default=5, type=int,
                         help="Classifier training epochs")
     parser.add_argument('--global_benchmark', default=False, action='store_true',
                         help="Train a global classifier as a benchmark model")
