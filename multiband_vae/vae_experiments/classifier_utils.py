@@ -42,7 +42,6 @@ class ClassifierValidator:
 
                 extracted = feature_extractor(x)
                 out = classifier(extracted)
-                out = out.squeeze(1)
                 correct_sum = self.get_correct_sum(out, y)
                 
                 correct += correct_sum.item()
@@ -52,6 +51,9 @@ class ClassifierValidator:
 
     def get_correct_sum(self, y_pred, y_test):
         _, y_pred_tag = torch.max(y_pred, 1)
+        # print(y_pred_tag)
+        # print(y_test)
+        # print('+++++++++')
         correct_results_sum = (y_pred_tag == y_test).sum().float()
         return correct_results_sum
 
@@ -66,7 +68,7 @@ def get_global_eval_dataloaders(task_names, val_dataset_splits, args):
             datasets.append(val_dataset_splits[i])
 
         eval_data = data.ConcatDataset(datasets)
-        eval_loader = data.DataLoader(dataset=eval_data, batch_size=args.val_batch_size, shuffle=False, num_workers=args.workers)
+        eval_loader = data.DataLoader(dataset=eval_data, batch_size=args.val_batch_size, shuffle=True, num_workers=args.workers)
         eval_loaders.append(eval_loader)
     
     return eval_loaders

@@ -4,8 +4,7 @@ import copy
 
 
 def train_multiband(args, models_definition, local_vae, curr_global_decoder, task_id, train_dataset_loader,
-                    train_dataset_loader_big, class_table,
-                    n_classes, device):
+                    train_dataset_loader_big, class_table, n_classes, device):
 
     if args.gen_load_pretrained_models:
         # local_vae=torch.load(args.gen_pretrained_models_dir + f'model{task_id}_local_vae').to(device)
@@ -50,7 +49,8 @@ def train_multiband(args, models_definition, local_vae, curr_global_decoder, tas
             print("Train global VAE model")
             curr_global_decoder = training_functions.train_global_decoder(curr_global_decoder=curr_global_decoder,
                                                                           local_vae=local_vae,
-                                                                          task_id=task_id, class_table=class_table,
+                                                                          task_id=task_id, 
+                                                                          class_table=class_table,
                                                                           n_iterations=len(train_dataset_loader),
                                                                           n_epochs=args.global_dec_epochs,
                                                                           batch_size=args.gen_batch_size,

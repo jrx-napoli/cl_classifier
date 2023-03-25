@@ -23,7 +23,10 @@ import wandb
 
 def run(args):
 
-    wandb.init(project=f"cl_classifier_{args.experiment_name}")
+    if args.global_benchmark:
+        wandb.init(project=f"cl_classifier_{args.experiment_name}_global_benchmark")
+    else:
+        wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
     if not os.path.exists('outputs'):
         os.mkdir('outputs')
@@ -48,8 +51,6 @@ def run(args):
                                                                              reverse=args.reverse,
                                                                              limit_classes=args.limit_classes)
 
-        
-
     # Calculate constants
     labels_tasks = {}
     for task_name, task in train_dataset_splits.items():
@@ -71,24 +72,25 @@ def run(args):
     fid_local_vae = OrderedDict()
 
 
+    # Prepare models
     if args.training_procedure == "classifier":
-        # Prepare classifier models
-        feature_extractor = classifier_models.FeatureExtractor(latent_size=args.gen_latent_size,
-                                                                d=args.gen_d, 
-                                                                cond_dim=n_classes, 
-                                                                cond_p_coding=args.gen_cond_p_coding, 
-                                                                cond_n_dim_coding=args.gen_cond_n_dim_coding, 
-                                                                device=device, 
-                                                                in_size=train_dataset[0][0].size()[1], 
-                                                                fc=args.fc).to(device)
-        # feature_extractor = resnet.ResNet18S(out_dim=args.gen_d * args.gen_latent_size).to(device)
-        print(feature_extractor)
+        input_size = train_dataset[0][0].size()[1]
+        
+        if args.generator_type == "vae":
+            translated_latent_size = args.gen_d * args.gen_latent_size
+        else:
+            translated_latent_size = 100
+        
+        if args.fe_type == "mlp400" or args.fe_type == "conv":
+            feature_extractor = classifier_models.FeatureExtractor(model_type=args.fe_type,
+                                                                    latent_size=translated_latent_size,
+                                                                    device=device, 
+                                                                    in_size=input_size).to(device)
+        elif args.fe_type == "resnet18":
+            feature_extractor = resnet.ResNet18(out_dim=translated_latent_size).to(device)
 
-        classifier = classifier_models.Head(latent_size=args.gen_latent_size, 
-                                            d=args.gen_d, 
-                                            device=device, 
-                                            in_size=train_dataset[0][0].size()[1], 
-                                            fc=args.fc).to(device)
+        classifier = classifier_models.Head(latent_size=translated_latent_size, device=device).to(device)
+        print(feature_extractor)
         print(classifier)
 
         # for classifiers accuracy validation chart purpose
@@ -104,12 +106,15 @@ def run(args):
         global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
                                                                                 val_dataset_splits=val_dataset_splits, 
                                                                                 args=args)
+        print(next(iter(global_eval_dataloaders[-1])))
+        
 
         # test calssifier's architecture
         if args.global_benchmark:
             feature_extractor_copy = copy.deepcopy(feature_extractor)
             classifier_copy = copy.deepcopy(classifier)
-            global_classifier_training.test_architecture(feature_extractor=feature_extractor_copy,
+            global_classifier_training.test_architecture(args=args,
+                                                            feature_extractor=feature_extractor_copy,
                                                             classifier=classifier_copy,
                                                             train_dataset_splits=train_dataset_splits,
                                                             val_dataset_splits=val_dataset_splits,
@@ -120,15 +125,18 @@ def run(args):
     elif args.training_procedure == "multiband":
         # Prepare VAE
         local_vae = models_definition.VAE(latent_size=args.gen_latent_size, 
-                                        binary_latent_size=args.binary_latent_size,
-                                        d=args.gen_d,
-                                        p_coding=args.gen_p_coding,
-                                        n_dim_coding=args.gen_n_dim_coding, cond_p_coding=args.gen_cond_p_coding,
-                                        cond_n_dim_coding=args.gen_cond_n_dim_coding, cond_dim=n_classes,
-                                        device=device, standard_embeddings=args.standard_embeddings,
-                                        trainable_embeddings=args.trainable_embeddings,
-                                        fc=args.fc,
-                                        in_size=train_dataset[0][0].size()[1]).to(device)
+                                            binary_latent_size=args.binary_latent_size,
+                                            d=args.gen_d,
+                                            p_coding=args.gen_p_coding,
+                                            n_dim_coding=args.gen_n_dim_coding, 
+                                            cond_p_coding=args.gen_cond_p_coding,
+                                            cond_n_dim_coding=args.gen_cond_n_dim_coding, 
+                                            cond_dim=n_classes,
+                                            device=device, 
+                                            standard_embeddings=args.standard_embeddings,
+                                            trainable_embeddings=args.trainable_embeddings,
+                                            fc=args.fc,
+                                            in_size=train_dataset[0][0].size()[1]).to(device)
         print(local_vae)
 
     translate_noise = True
@@ -170,6 +178,9 @@ def run(args):
 
     for task_id in range(len(task_names)):
 
+        if args.final_task_only and task_id != task_names[-1]:
+            continue
+
         print("\n######### Task number {} #########".format(task_id))
         task_name = task_names[task_id]
 
@@ -177,7 +188,8 @@ def run(args):
         train_dataset_loader_big = train_loaders_big[task_id]
 
         if args.training_procedure == "multiband":
-            curr_global_decoder = multiband_training.train_multiband(args=args, models_definition=models_definition,
+            curr_global_decoder = multiband_training.train_multiband(args=args, 
+                                                                    models_definition=models_definition,
                                                                     local_vae=local_vae,
                                                                     curr_global_decoder=curr_global_decoder,
                                                                     task_id=task_id,
@@ -198,7 +210,8 @@ def run(args):
             feature_extractor, classifier = classifier_training.train_classifier(args=args, 
                                                                                 feature_extractor=feature_extractor,
                                                                                 classifier=classifier,
-                                                                                task_id=task_id,
+                                                                                train_loader=train_dataset_loader,
+                                                                                task_id=19,
                                                                                 device=device)
         else:
             print("Wrong training procedure")
@@ -217,7 +230,7 @@ def run(args):
 
             cv = classifier_utils.ClassifierValidator()
 
-            # Calculate global accuracy for current task
+            # Calculate current accuracy
             correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
                                                     classifier=classifier, 
                                                     data_loader=global_eval_dataloaders[task_id])             
@@ -227,7 +240,7 @@ def run(args):
             global_accuracies.append(acc)
 
             # At the end of the training display global accuracy graph 
-            if task_id == task_names[-1]:
+            if task_id == task_names[-1] and not args.final_task_only:
                 plt.plot(task_names, global_accuracies)
                 plt.title("Global classifier accuracy")
                 plt.xlabel("Task id")
@@ -259,7 +272,7 @@ def run(args):
 
 
             # At the end of the training display per-task accuracy graph
-            if task_id == task_names[-1]:
+            if task_id == task_names[-1] and not args.final_task_only:
 
                 for j in range(len(task_names)):
                     plt.plot(x[j], accuracy[j])
@@ -402,11 +415,13 @@ def get_args(argv):
     # classifier
     parser.add_argument('--generator_type', type=str, default="vae",
                         help='vae|gan')
+    parser.add_argument('--fe_type', type=str, default="mlp400",
+                        help='mlp400|conv|resnet18')
     parser.add_argument('--gen_load_feature_extractor', default=False, action='store_true',
                         help="Load Feature Extractor")
     parser.add_argument('--gen_load_classifier', default=False, action='store_true',
                         help="Load Classifier")
-    parser.add_argument('--feature_extractor_epochs', default=20, type=int,
+    parser.add_argument('--feature_extractor_epochs', default=30, type=int,
                         help="Feature Extractor training epochs")
     parser.add_argument('--classifier_epochs', default=5, type=int,
                         help="Classifier training epochs")
@@ -414,6 +429,11 @@ def get_args(argv):
                         help="Train a global classifier as a benchmark model")
     parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',
                         help="During validation, calculate feature extractors cosine similarity")
+    parser.add_argument('--reset_model', default=False, action='store_true',
+                        help="Reset model before every task")
+    parser.add_argument('--final_task_only', default=False, action='store_true',
+                        help="Reset model before every task")
+    
     
 
     args = parser.parse_args(argv)
