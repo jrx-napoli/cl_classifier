@@ -11,21 +11,22 @@ import matplotlib.pyplot as plt
 import continual_benchmark.dataloaders.base
 import continual_benchmark.dataloaders as dataloaders
 from continual_benchmark.dataloaders.datasetGen import data_split
-from vae_experiments import classifier_utils
+from vae_experiments import classifier_utils, resnet
 from vae_experiments import multiband_training, classifier_training, replay_training, training_functions
-import global_classifier_training
 from vae_experiments import vae_utils
 from vae_experiments.validation import Validator, CERN_Validator
-from vae_experiments import models_definition, classifier
+from vae_experiments import models_definition, classifier_models
+import global_classifier_training
 from visualise import *
-import time
-
-
 import wandb
-wandb.init(project="cl_classifier")
 
 
 def run(args):
+
+    if args.global_benchmark:
+        wandb.init(project=f"cl_classifier_{args.experiment_name}_global_benchmark")
+    else:
+        wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
     if not os.path.exists('outputs'):
         os.mkdir('outputs')
@@ -50,8 +51,6 @@ def run(args):
                                                                              reverse=args.reverse,
                                                                              limit_classes=args.limit_classes)
 
-        
-
     # Calculate constants
     labels_tasks = {}
     for task_name, task in train_dataset_splits.items():
@@ -72,77 +71,76 @@ def run(args):
     test_fid_table = OrderedDict()
     fid_local_vae = OrderedDict()
 
-    # for classifiers accuracy validation chart purpose
-    global_accuracies = []
-    x = []
-    accuracy = []
-    for task in task_names:
-        accuracy.append([])
-        x.append([])
-        for i, _ in enumerate(x):
-            x[i].append(task)
 
-
+    # Prepare models
     if args.training_procedure == "classifier":
-        # Prepare feature extractor
-        feature_extractor = classifier.FeatureExtractor(latent_size=args.gen_latent_size, d=args.gen_d, cond_dim=n_classes, 
-                                                        cond_p_coding=args.gen_cond_p_coding, cond_n_dim_coding=args.gen_cond_n_dim_coding, 
-                                                        device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)    
+        input_size = train_dataset[0][0].size()[1]
+        
+        if args.generator_type == "vae":
+            translated_latent_size = args.gen_d * args.gen_latent_size
+        else:
+            translated_latent_size = 100
+        
+        if args.fe_type == "mlp400" or args.fe_type == "conv":
+            feature_extractor = classifier_models.FeatureExtractor(model_type=args.fe_type,
+                                                                    latent_size=translated_latent_size,
+                                                                    device=device, 
+                                                                    in_size=input_size).to(device)
+        elif args.fe_type == "resnet18":
+            feature_extractor = resnet.ResNet18(out_dim=translated_latent_size).to(device)
+
+        classifier = classifier_models.Head(latent_size=translated_latent_size, device=device).to(device)
         print(feature_extractor)
+        print(classifier)
+
+        # for classifiers accuracy validation chart purpose
+        global_accuracies = []
+        x = []
+        accuracy = []
+        for task in task_names:
+            accuracy.append([])
+            x.append([])
+            for i, _ in enumerate(x):
+                x[i].append(task)
+        
+        global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
+                                                                                val_dataset_splits=val_dataset_splits, 
+                                                                                args=args)
+        print(next(iter(global_eval_dataloaders[-1])))
+        
+
+        # test calssifier's architecture
+        if args.global_benchmark:
+            feature_extractor_copy = copy.deepcopy(feature_extractor)
+            classifier_copy = copy.deepcopy(classifier)
+            global_classifier_training.test_architecture(args=args,
+                                                            feature_extractor=feature_extractor_copy,
+                                                            classifier=classifier_copy,
+                                                            train_dataset_splits=train_dataset_splits,
+                                                            val_dataset_splits=val_dataset_splits,
+                                                            device=device)
+            return
 
 
-        # Prepare head
-        head = classifier.Head(latent_size=args.gen_latent_size, d=args.gen_d, 
-                                device=device, in_size=train_dataset[0][0].size()[1], fc=args.fc).to(device)
-        print(head)
-    
-
-    # Prepare VAE
-    local_vae = models_definition.VAE(latent_size=args.gen_latent_size, binary_latent_size=args.binary_latent_size,
-                                      d=args.gen_d,
-                                      p_coding=args.gen_p_coding,
-                                      n_dim_coding=args.gen_n_dim_coding, cond_p_coding=args.gen_cond_p_coding,
-                                      cond_n_dim_coding=args.gen_cond_n_dim_coding, cond_dim=n_classes,
-                                      device=device, standard_embeddings=args.standard_embeddings,
-                                      trainable_embeddings=args.trainable_embeddings,
-                                      fc=args.fc,
-                                      in_size=train_dataset[0][0].size()[1]).to(device)
-    print(local_vae)
+    elif args.training_procedure == "multiband":
+        # Prepare VAE
+        local_vae = models_definition.VAE(latent_size=args.gen_latent_size, 
+                                            binary_latent_size=args.binary_latent_size,
+                                            d=args.gen_d,
+                                            p_coding=args.gen_p_coding,
+                                            n_dim_coding=args.gen_n_dim_coding, 
+                                            cond_p_coding=args.gen_cond_p_coding,
+                                            cond_n_dim_coding=args.gen_cond_n_dim_coding, 
+                                            cond_dim=n_classes,
+                                            device=device, 
+                                            standard_embeddings=args.standard_embeddings,
+                                            trainable_embeddings=args.trainable_embeddings,
+                                            fc=args.fc,
+                                            in_size=train_dataset[0][0].size()[1]).to(device)
+        print(local_vae)
 
     translate_noise = True
     class_table = torch.zeros(n_tasks, n_classes, dtype=torch.long)
-
-
-    def get_global_eval_dataloaders():
-        # Eval dataset contains datasets from all previous tasks
-        eval_loaders = []
-        for task_id in task_names:
-            datasets = []
-
-            for i in range(task_id + 1):
-                datasets.append(val_dataset_splits[i])
-
-            eval_data = data.ConcatDataset(datasets)
-            eval_loader = data.DataLoader(dataset=eval_data, batch_size=args.val_batch_size, shuffle=False,
-                                        num_workers=args.workers)
-            eval_loaders.append(eval_loader)
-        
-        return eval_loaders
-
-
-    global_eval_dataloaders = get_global_eval_dataloaders()
-
-
-
-    # Calculate global accuracy for current task
-    # lenet = torch.load(f"results/class_based/FashionMNIST_example/lenet_gloabl")
-    # print("lenet")
-    # print(lenet)
-    # cv = classifier_utils.ClassifierValidator()
-    # correct, total = cv.validate_global_benchamrk(test_model=lenet, data_loader=global_eval_dataloaders[-1]) # set correct dataloader
-    # acc = np.round(100 * correct/total, 3)
-    # print(f'Global accuracy: {acc} %')
-    # # return acc
 
     train_loaders = []
     train_loaders_big = []
@@ -180,6 +178,9 @@ def run(args):
 
     for task_id in range(len(task_names)):
 
+        if args.final_task_only and task_id != task_names[-1]:
+            continue
+
         print("\n######### Task number {} #########".format(task_id))
         task_name = task_names[task_id]
 
@@ -187,7 +188,8 @@ def run(args):
         train_dataset_loader_big = train_loaders_big[task_id]
 
         if args.training_procedure == "multiband":
-            curr_global_decoder = multiband_training.train_multiband(args=args, models_definition=models_definition,
+            curr_global_decoder = multiband_training.train_multiband(args=args, 
+                                                                    models_definition=models_definition,
                                                                     local_vae=local_vae,
                                                                     curr_global_decoder=curr_global_decoder,
                                                                     task_id=task_id,
@@ -205,46 +207,40 @@ def run(args):
                                                                                 class_table=class_table)
             class_table[task_id] = tmp_table
         elif args.training_procedure == "classifier":
-            feature_extractor, curr_global_decoder, local_vae, head = classifier_training.train_classifier(args=args, models_definition=models_definition,
-                                                                                local_vae=local_vae,
-                                                                                curr_global_decoder=curr_global_decoder,
+            feature_extractor, classifier = classifier_training.train_classifier(args=args, 
                                                                                 feature_extractor=feature_extractor,
-                                                                                head=head,
-                                                                                task_id=task_id,
-                                                                                train_dataset_loader=train_dataset_loader,
-                                                                                train_dataset_splits=train_dataset_splits,
-                                                                                train_dataset_loader_big=train_dataset_loader_big,
-                                                                                class_table=class_table, 
-                                                                                n_classes=n_classes,
-                                                                                device=device,
-                                                                                binary_head=args.binary_head,
-                                                                                global_benchmark=args.global_benchmark)
+                                                                                classifier=classifier,
+                                                                                train_loader=train_dataset_loader,
+                                                                                task_id=19,
+                                                                                device=device)
         else:
             print("Wrong training procedure")
             return None
         
         # if not using pretrained models, save multiband 
-        if not args.gen_load_pretrained_models:
-            torch.save(local_vae, f"results/class_based/{args.experiment_name}/model{task_id}_local_vae")
-            torch.save(curr_global_decoder, f"results/class_based/{args.experiment_name}/model{task_id}_curr_decoder")
+        if not args.gen_load_pretrained_models and args.training_procedure == "multiband":
+            torch.save(local_vae, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_local_vae")
+            torch.save(curr_global_decoder, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_curr_decoder")
 
 
-        # save feature extractor and current head
+        # save feature extractor and classifier
         if args.training_procedure == "classifier":
-            torch.save(feature_extractor, f"results/class_based/{args.experiment_name}/model{task_id}_feature_extractor")
-            torch.save(head, f"results/class_based/{args.experiment_name}/model{task_id}_head")
+            torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
+            torch.save(classifier, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 
             cv = classifier_utils.ClassifierValidator()
 
-            # Calculate global accuracy for current task
-            correct, total = cv.validate_classifier(fe=feature_extractor, head=head, data_loader=global_eval_dataloaders[task_id], binary_head=args.binary_head) # set correct dataloader
+            # Calculate current accuracy
+            correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
+                                                    classifier=classifier, 
+                                                    data_loader=global_eval_dataloaders[task_id])             
             acc = np.round(100 * correct/total, 3)
             print(f'Global accuracy: {acc} %')
             wandb.log({"Global accuracy": (acc)})
             global_accuracies.append(acc)
 
             # At the end of the training display global accuracy graph 
-            if task_id == task_names[-1]:
+            if task_id == task_names[-1] and not args.final_task_only:
                 plt.plot(task_names, global_accuracies)
                 plt.title("Global classifier accuracy")
                 plt.xlabel("Task id")
@@ -255,35 +251,28 @@ def run(args):
 
             # Validate Feature Extractor on all tasks
             if args.calc_cosine_similarity == True:
-                print(f'\nFeature extractors mean cosine similarity:') 
+                print(f'\nFeature extractor\'s mean cosine similarity:') 
                 for i in range(task_id + 1):
-                    result = cv.validate_feature_extractor(dataset=None,
-                                                            # dataset=val_dataset_splits[i].dataset,
-                                                            encoder=local_vae.encoder, 
+                    val_dataset_loader = val_loaders[i]
+                    result = cv.validate_feature_extractor(encoder=local_vae.encoder, 
                                                             translator=curr_global_decoder.translator, 
-                                                            decoder=curr_global_decoder,
-                                                            task_id=task_id, 
-                                                            class_table=curr_global_decoder.class_table,
-                                                            latent_size=local_vae.latent_size,
-                                                            gen_batch_size=args.gen_batch_size,
-                                                            feature_extractor=feature_extractor)
+                                                            feature_extractor=feature_extractor, 
+                                                            data_loader=val_dataset_loader)
                     print(f'Task {i}: {result}')
         
             # Validate Classifer on all tasks
-            if not args.binary_head:
-                for i in range(task_id + 1):
-                    # val_dataset_loader = dual_val_loaders[i]
-                    val_dataset_loader = val_loaders[i]
-                    correct, total = cv.validate_classifier(fe=feature_extractor, head=head, data_loader=val_dataset_loader, binary_head=args.binary_head)
-                    acc = np.round(100 * correct/total, 3)
-                    print(f'Task {i}: {correct}/{total} ({acc} %)')
-                    accuracy[i].append(acc)
-            else:
-                # todo: add validation for binary head
-                pass
+            for i in range(task_id + 1):
+                val_dataset_loader = val_loaders[i]
+                correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
+                                                        classifier=classifier, 
+                                                        data_loader=val_dataset_loader)
+                acc = np.round(100 * correct/total, 3)
+                print(f'Task {i}: {correct}/{total} ({acc} %)')
+                accuracy[i].append(acc)
+
 
             # At the end of the training display per-task accuracy graph
-            if task_id == task_names[-1]:
+            if task_id == task_names[-1] and not args.final_task_only:
 
                 for j in range(len(task_names)):
                     plt.plot(x[j], accuracy[j])
@@ -311,19 +300,24 @@ def run(args):
                                                                             dataset=args.dataset)
                 fid_local_vae[task_id] = fid_result
                 print(f"FID local VAE: {fid_result}")
-            for j in range(task_id + 1):
-                val_name = task_names[j]
-                print('validation split name:', val_name)
-                fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
-                                                                            class_table=curr_global_decoder.class_table,
-                                                                            task_id=j,
-                                                                            translate_noise=translate_noise,
-                                                                            dataset=args.dataset)  # task_id != 0)
-                fid_table[j][task_name] = fid_result
-                precision_table[j][task_name] = precision
-                recall_table[j][task_name] = recall
-                print(f"FID task {j}: {fid_result}")
-        local_vae.decoder = copy.deepcopy(curr_global_decoder)
+    
+            if (args.training_procedure == "multiband"):
+                for j in range(task_id + 1):
+                    val_name = task_names[j]
+                    print('validation split name:', val_name)
+                    fid_result, precision, recall = validator.calculate_results(curr_global_decoder=curr_global_decoder,
+                                                                                class_table=curr_global_decoder.class_table,
+                                                                                task_id=j,
+                                                                                translate_noise=translate_noise,
+                                                                                dataset=args.dataset)  # task_id != 0)
+                    fid_table[j][task_name] = fid_result
+                    precision_table[j][task_name] = precision
+                    recall_table[j][task_name] = recall
+                    print(f"FID task {j}: {fid_result}")
+                
+        if (args.training_procedure == "multiband"):
+            local_vae.decoder = copy.deepcopy(curr_global_decoder)
+    
     return fid_table, task_names, test_fid_table, precision_table, recall_table, fid_local_vae
 
 
@@ -397,7 +391,7 @@ def get_args(argv):
     parser.add_argument('--gen_ae_epochs', type=int, default=70,
                         help="Number of epochs to train local variational autoencoder")
     parser.add_argument('--global_dec_epochs', type=int, default=140, help="Number of epochs to train global decoder")
-    parser.add_argument('--gen_load_pretrained_models', default=True, action='store_true', # 
+    parser.add_argument('--gen_load_pretrained_models', default=False, action='store_true', 
                         help="Load pretrained generative models")
     parser.add_argument('--gen_pretrained_models_dir', type=str, default="results/MNIST_example/",
                         help="Directory of pretrained generative models")
@@ -419,22 +413,27 @@ def get_args(argv):
                         help="Whether to visualise latent space")
 
     # classifier
+    parser.add_argument('--generator_type', type=str, default="vae",
+                        help='vae|gan')
+    parser.add_argument('--fe_type', type=str, default="mlp400",
+                        help='mlp400|conv|resnet18')
     parser.add_argument('--gen_load_feature_extractor', default=False, action='store_true',
                         help="Load Feature Extractor")
-    parser.add_argument('--gen_load_head', default=False, action='store_true',
-                        help="Load Classifier Head")
-    parser.add_argument('--feature_extractor_epochs', default=10, type=int,
+    parser.add_argument('--gen_load_classifier', default=False, action='store_true',
+                        help="Load Classifier")
+    parser.add_argument('--feature_extractor_epochs', default=30, type=int,
                         help="Feature Extractor training epochs")
-    parser.add_argument('--head_epochs', default=4, type=int,
-                        help="Head training epochs")
-    parser.add_argument('--binary_head', default=False, action='store_true',
-                        help="Enable binary head training")
+    parser.add_argument('--classifier_epochs', default=5, type=int,
+                        help="Classifier training epochs")
     parser.add_argument('--global_benchmark', default=False, action='store_true',
                         help="Train a global classifier as a benchmark model")
     parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',
                         help="During validation, calculate feature extractors cosine similarity")
-    parser.add_argument('--class_split', default=False, action='store_true',
-                        help="eg. Split-MNIST scenario, each task contains two new classes")
+    parser.add_argument('--reset_model', default=False, action='store_true',
+                        help="Reset model before every task")
+    parser.add_argument('--final_task_only', default=False, action='store_true',
+                        help="Reset model before every task")
+    
     
 
     args = parser.parse_args(argv)
