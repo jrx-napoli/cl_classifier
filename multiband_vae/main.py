@@ -211,7 +211,7 @@ def run(args):
                                                                                 feature_extractor=feature_extractor,
                                                                                 classifier=classifier,
                                                                                 train_loader=train_dataset_loader,
-                                                                                task_id=19,
+                                                                                task_id=task_id,
                                                                                 device=device)
         else:
             print("Wrong training procedure")
@@ -433,6 +433,10 @@ def get_args(argv):
                         help="Reset model before every task")
     parser.add_argument('--final_task_only', default=False, action='store_true',
                         help="Reset model before every task")
+    parser.add_argument('--train_on_available_data', default=True, action='store_true',
+                        help="Train on available real samples")
+    parser.add_argument('--wandb_log', default=True, action='store_true',
+                        help="Log training process on wandb")
     
     
 

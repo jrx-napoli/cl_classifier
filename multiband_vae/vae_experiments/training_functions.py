@@ -260,18 +260,27 @@ def train_global_decoder(curr_global_decoder, local_vae, task_id, class_table,
                     f"Epoch: {epoch} - changing from batches: {[(idx, n_changes) for idx, n_changes in enumerate(sum_changed.tolist())]}")
     return global_decoder
 
-def train_feature_extractor(args, feature_extractor, n_epochs, decoder, task_id, batch_size, 
-                            train_loader=None, train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
-    # n_epochs = 3
+def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
+                            train_loader=None, local_start_lr=0.001, scheduler_rate=0.99):
     wandb.watch(feature_extractor)
     feature_extractor.train()
     decoder.translator.eval()
     decoder.eval()
 
-    # n_iterations = len(train_loader) if not None else 250 # parametrise
-    n_iterations = 100 # parametrise
+    n_epochs = args.feature_extractor_epochs
+    batch_size = args.gen_batch_size
 
+    n_iterations = len(train_loader) if train_loader else 250 # NOTE parametrise n of iterations if no real data is used 
     print(f'iterations: {n_iterations}')
+
+    if train_loader:
+        n_prev_examples = int(batch_size * min(task_id, 5))
+        n_tasks = task_id
+    else:
+        n_prev_examples = int(batch_size * min(task_id + 1, 5))
+        n_tasks = task_id + 1
+    print(f'generations per iteration: {n_prev_examples}')
+
     lr = local_start_lr
     print(f"feature extractor's lr set to: {lr}")
 
@@ -288,13 +297,11 @@ def train_feature_extractor(args, feature_extractor, n_epochs, decoder, task_id,
 
             with torch.no_grad():
 
-                # generated data
-                n_prev_examples = int(batch_size * min(task_id + 1, 5))
-
+                # rehearsal data
                 if args.generator_type == "vae":
-                    generations, classes, random_noise, translator_emb = generate_previous_data(
+                    generations, _, _, translator_emb = generate_previous_data(
                         decoder,
-                        n_tasks=task_id + 1,
+                        n_tasks=n_tasks,
                         n_img=n_prev_examples,
                         num_local=batch_size,
                         return_z=True,
@@ -302,31 +309,44 @@ def train_feature_extractor(args, feature_extractor, n_epochs, decoder, task_id,
                         same_z=False)
 
                 elif args.generator_type == "gan":
-                    generations, random_noise, classes, translator_emb = gan_experiments.gan_utils.generate_previous_data(
-                        n_prev_tasks=100, # task_id+1 to include current task
+                    # TODO bugfix: number of generations is rounded down
+                    generations, _, classes, translator_emb = gan_experiments.gan_utils.generate_previous_data(
+                        n_prev_tasks=5*n_tasks, # TODO adjust for cifar100 example - x5 for 20 tasks?
                         n_prev_examples=n_prev_examples,
                         curr_global_generator=decoder)
                 
-                generations = generations.to("cuda")
+                generations = generations.to(device)
+                print(f'actual number of generations: {len(generations)}')
 
                 # local data
-                # local_imgs, local_classes, _ = next(iter(train_loader))
-                # local_imgs = local_imgs.to("cuda")
-                # local_classes = local_classes.to("cuda")
-                # local_z = torch.randn(len(local_imgs), decoder.latent_dim)
-                # local_z = local_z.to("cuda")
-                # local_translator_emb = decoder.translator(local_z, local_classes)
+                local_imgs, local_classes, _ = next(iter(train_loader))
+                local_imgs = local_imgs.to(device)
+                local_classes = local_classes.to(device)
+
+            # optimise noise
+            if args.generator_type == "vae":
+                # TODO implement vae sample encoding 
+                pass
+
+            elif args.generator_type == "gan":
+                # TODO save embedings for entire dataloader -> optimise them only during the first epoch
+                _, local_translator_emb = gan_experiments.gan_utils.optimize_noise(images=local_imgs, 
+                                                                                    generator=decoder, 
+                                                                                    n_iterations=200, # NOTE parametrise?
+                                                                                    task_id=task_id, 
+                                                                                    lr=0.01,
+                                                                                    labels=local_classes)
+                local_translator_emb = local_translator_emb.detach()
 
             # concat local and generated data
-            # generations = torch.cat([generations, local_imgs])
-            # translator_emb = torch.cat([translator_emb, local_translator_emb])
+            generations = torch.cat([generations, local_imgs])
+            translator_emb = torch.cat([translator_emb, local_translator_emb])
 
             # shuffle
             n_mini_batches = math.ceil(len(generations) / batch_size)
             shuffle = torch.randperm(len(generations))
             generations = generations[shuffle]
             translator_emb = translator_emb[shuffle]
-            print(classes)
 
             for batch_id in range(n_mini_batches):
                 start_point = batch_id * batch_size
@@ -348,10 +368,11 @@ def train_feature_extractor(args, feature_extractor, n_epochs, decoder, task_id,
         scheduler.step()
 
         if epoch % 1 == 0:
-            print("Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(epoch, n_epochs,
-                                                                                np.round(np.mean(losses), 3),
-                                                                                np.round(np.mean(cosine_distances), 3),
-                                                                                np.round(time.time() - start), 3))
+            print("Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(epoch, 
+                                                                                     n_epochs,
+                                                                                     np.round(np.mean(losses), 3),
+                                                                                     np.round(np.mean(cosine_distances), 3),
+                                                                                     np.round(time.time() - start), 3))
 
     return feature_extractor
 

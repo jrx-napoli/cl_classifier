@@ -157,7 +157,7 @@ def optimize_noise(
     optimizer = torch.optim.Adam([noise], lr=lr)
     for i in range(n_iterations):
         optimizer.zero_grad()
-        generations = generator(noise, task_ids)
+        generations, translator_emb = generator(noise, task_ids, return_emb=True)
         loss = criterion(generations, images)
         loss.backward()
         optimizer.step()
@@ -173,4 +173,4 @@ def optimize_noise(
                 }
             )
 
-    return noise
+    return noise, translator_emb
