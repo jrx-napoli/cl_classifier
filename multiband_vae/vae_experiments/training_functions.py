@@ -270,19 +270,19 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
     n_epochs = args.feature_extractor_epochs
     batch_size = args.gen_batch_size
 
-    n_iterations = len(train_loader) if train_loader else 250 # NOTE parametrise n of iterations if no real data is used 
-    print(f'iterations: {n_iterations}')
-
     if train_loader:
+        n_iterations = len(train_loader)
         n_prev_examples = int(batch_size * min(task_id, 5))
         n_tasks = task_id
     else:
+        n_iterations = 100 # TODO parametrise this
         n_prev_examples = int(batch_size * min(task_id + 1, 5))
         n_tasks = task_id + 1
-    print(f'generations per iteration: {n_prev_examples}')
-
     lr = local_start_lr
-    print(f"feature extractor's lr set to: {lr}")
+
+    print(f'Iterations: {n_iterations}')
+    print(f'Generations per iteration: {n_prev_examples}')
+    print(f"Feature extractor's lr set to: {lr}")
 
     criterion = nn.MSELoss(reduction="sum")
     optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr)
@@ -306,7 +306,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 local_classes = local_classes.to(device)
                 _, local_translator_emb = gan_experiments.gan_utils.optimize_noise(images=local_imgs, 
                                                                                     generator=decoder, 
-                                                                                    n_iterations=1,
+                                                                                    n_iterations=500,
                                                                                     task_id=task_id, # NOTE task_id does not matter in this implementation
                                                                                     lr=0.01,
                                                                                     labels=local_classes)
@@ -318,11 +318,19 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                     local_translator_emb_cache = torch.cat((local_translator_emb_cache, local_translator_emb), 0)
                 
 
-        for iteration in range(n_iterations):
+        for iteration, batch in enumerate(train_loader):
 
+            # local data
+            local_imgs, local_classes = batch
+            local_imgs = local_imgs.to(device)
+
+            emb_start_point = iteration * batch_size
+            emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
+            local_translator_emb = local_translator_emb_cache[emb_start_point:emb_end_point]
+
+            # rehearsal data
             with torch.no_grad():
-                
-                # rehearsal data
+
                 if args.generator_type == "vae":
                     generations, _, _, translator_emb = generate_previous_data(
                         decoder,
@@ -336,30 +344,11 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 elif args.generator_type == "gan":
                     # TODO bugfix: number of generations is rounded down
                     generations, _, classes, translator_emb = gan_experiments.gan_utils.generate_previous_data(
-                        n_prev_tasks=5*n_tasks, # TODO adjust for cifar100 example - x5 for 20 tasks?
+                        n_prev_tasks=(5*n_tasks), # TODO adjust for cifar100 example - x5 for 20 tasks?
                         n_prev_examples=n_prev_examples,
                         curr_global_generator=decoder)
                 
                 generations = generations.to(device)
-
-                # local data
-                local_imgs, local_classes = next(iter(train_loader))
-                local_imgs = local_imgs.to(device)
-                
-                # fig = plt.figure()
-                # for i in range(50):
-                #     plt.subplot(5,10,i+1)
-                #     plt.tight_layout()
-                #     plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
-                #     plt.title("Ground Truth: {}".format(local_classes[i]))
-                #     plt.xticks([])
-                #     plt.yticks([])
-                # plt.show()
-                # print(f'local_classes: {local_classes}')
-
-                emb_start_point = iteration * batch_size
-                emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
-                local_translator_emb = local_translator_emb_cache[emb_start_point:emb_end_point]
 
 
             # concat local and generated data

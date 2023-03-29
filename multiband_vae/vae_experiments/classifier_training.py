@@ -32,6 +32,8 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                                                                        task_id=task_id,
                                                                        device=device)
         print("Done training feature extractor\n")
+        torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor_BETA")
+        torch.save(local_translator_emb_cache, f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
 
 
     if args.gen_load_classifier:

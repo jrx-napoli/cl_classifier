@@ -23,7 +23,8 @@ def get_dataloader(args, dataset):
             sub_datasets.append(train_subset)
 
             concat_dataset = ConcatDataset(sub_datasets)
-            loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=True))
+            # NOTE -> no shuffeling, because of gan noise chache
+            loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=False, drop_last=True))
         
         return loaders
     
