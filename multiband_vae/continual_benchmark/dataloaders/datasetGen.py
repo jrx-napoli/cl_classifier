@@ -146,8 +146,15 @@ def data_split(dataset, dataset_name, num_batches=5, num_classes=10, random_spli
         if dataset_name in ["omniglot", "doublemnist", "flowers"]:
             one_split = num_classes // num_batches
             batch_split = {i: [list(range(i * one_split, (i + 1) * one_split))] for i in range(num_batches)}
+
+        elif dataset_name == "cifar100":
+            batch_split = {i: [i] for i in range(num_batches)}
+            print(f'\nbatch_split: {batch_split}\n')
+            print(f'\ndataset: {dataset_name}\n')
+
         else:
             batch_split = {i: [i] for i in range(num_batches)}
+
     if reverse:
         batch_split_reversed = {}
         for batch_id in batch_split:
@@ -180,8 +187,7 @@ def data_split(dataset, dataset_name, num_batches=5, num_classes=10, random_spli
         class_indices = torch.LongTensor(dataset.labels)
 
     if num_batches == 1:
-        class_indices = (
-                                class_indices - class_indices % 2) // 2  # To have the same classes as batch indices in normal setup
+        class_indices = (class_indices - class_indices % 2) // 2  # To have the same classes as batch indices in normal setup
     # dirichlet_split_alpha = 1
     batch_indices = (torch.zeros(len(dataset), num_batches))
     if dirichlet_split_alpha != None:

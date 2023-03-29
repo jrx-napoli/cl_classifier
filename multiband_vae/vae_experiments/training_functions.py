@@ -319,9 +319,20 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 print(f'actual number of generations: {len(generations)}')
 
                 # local data
-                local_imgs, local_classes, _ = next(iter(train_loader))
+                local_imgs, local_classes, _ = next(iter(train_loader)) # TODO bugfix: in CIFAR100 example every image has a class == taskid
                 local_imgs = local_imgs.to(device)
                 local_classes = local_classes.to(device)
+
+                fig = plt.figure()
+                for i in range(50):
+                    plt.subplot(5,10,i+1)
+                    plt.tight_layout()
+                    plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
+                    plt.title("Ground Truth: {}".format(local_classes[i]))
+                    plt.xticks([])
+                    plt.yticks([])
+                plt.show()
+                print(f'local_classes: local_classes{local_classes}')
 
             # optimise noise
             if args.generator_type == "vae":

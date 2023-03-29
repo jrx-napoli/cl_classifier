@@ -19,6 +19,7 @@ from vae_experiments import models_definition, classifier_models
 import global_classifier_training
 from visualise import *
 import wandb
+from torch.utils.data import Subset, ConcatDataset
 
 
 def run(args):
@@ -39,6 +40,7 @@ def run(args):
     else:
         n_classes = train_dataset.number_classes
 
+    # TODO create data split for cifar100 CI_20 scenario - 500:100
     n_batches = args.num_batches
     train_dataset_splits, val_dataset_splits, task_output_space = data_split(dataset=train_dataset,
                                                                              dataset_name=args.dataset.lower(),
@@ -106,7 +108,6 @@ def run(args):
         global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
                                                                                 val_dataset_splits=val_dataset_splits, 
                                                                                 args=args)
-        print(next(iter(global_eval_dataloaders[-1])))
         
 
         # test calssifier's architecture
@@ -175,6 +176,61 @@ def run(args):
             validator = CERN_Validator(dataloaders=val_loaders, stats_file_name=stats_file_name, device=device)
     curr_global_decoder = None
     
+
+
+
+
+
+
+
+
+    if args.dataset.lower() == "cifar100":
+        # split cifar into 20 disjoint tasks, each containing 5 new classes    
+        print(len(train_dataset))
+        print(len(val_dataset))
+        print(torch.unique(train_dataset.labels, return_counts=True) )
+        train_loaders = []
+
+        for task_id in range(20):
+
+            sub_datasets = []
+            idx = torch.zeros_like(train_dataset.labels)
+
+            for class_id in range(5):
+                class_idx = torch.tensor(train_dataset.labels) == ((task_id * 5) + class_id)
+                idx = idx | class_idx
+                mask = idx.nonzero().reshape(-1)
+
+            train_subset = Subset(train_dataset, mask)
+            sub_datasets.append(train_subset)
+
+            concat_dataset = ConcatDataset(sub_datasets)
+            train_loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=False))
+
+
+
+    for j in range(len(train_loaders[0])):
+        local_imgs, local_classes = next(iter(train_loaders[0])) # TODO bugfix: in CIFAR100 example every image in a task has the same class!
+        local_imgs = local_imgs.to(device)
+        local_classes = local_classes.to(device)
+        print(torch.unique(local_classes, return_counts=True))
+
+        fig = plt.figure()
+        for i in range(50):
+            plt.subplot(5,10,i+1)
+            plt.tight_layout()
+            plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
+            plt.title("Ground Truth: {}".format(local_classes[i]))
+            plt.xticks([])
+            plt.yticks([])
+        plt.show()
+        print(f'local_classes: local_classes{local_classes}')
+
+
+
+
+
+
 
     for task_id in range(len(task_names)):
 
