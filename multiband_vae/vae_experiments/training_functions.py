@@ -288,15 +288,40 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
     optimizer = torch.optim.Adam(list(feature_extractor.parameters()), lr=lr)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
     
+    local_translator_emb_cache = None    
+    
     for epoch in range(n_epochs):
         losses = []
         cosine_distances = []
         start = time.time()
 
+        # Optimise noise and store it for entire training
+        if epoch == 0 and args.generator_type == "gan":
+            print("Noise optimisation for GAN embeddings")
+            for iteration, batch in enumerate(train_loader):
+                print(f"Batch {iteration}/{n_iterations}")
+
+                local_imgs, local_classes = batch
+                local_imgs = local_imgs.to(device)
+                local_classes = local_classes.to(device)
+                _, local_translator_emb = gan_experiments.gan_utils.optimize_noise(images=local_imgs, 
+                                                                                    generator=decoder, 
+                                                                                    n_iterations=1,
+                                                                                    task_id=task_id, # NOTE task_id does not matter in this implementation
+                                                                                    lr=0.01,
+                                                                                    labels=local_classes)
+                local_translator_emb = local_translator_emb.detach()
+
+                if local_translator_emb_cache == None:
+                    local_translator_emb_cache = local_translator_emb
+                else:
+                    local_translator_emb_cache = torch.cat((local_translator_emb_cache, local_translator_emb), 0)
+                
+
         for iteration in range(n_iterations):
 
             with torch.no_grad():
-
+                
                 # rehearsal data
                 if args.generator_type == "vae":
                     generations, _, _, translator_emb = generate_previous_data(
@@ -316,38 +341,26 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                         curr_global_generator=decoder)
                 
                 generations = generations.to(device)
-                print(f'actual number of generations: {len(generations)}')
 
                 # local data
-                local_imgs, local_classes, _ = next(iter(train_loader)) # TODO bugfix: in CIFAR100 example every image has a class == taskid
+                local_imgs, local_classes = next(iter(train_loader))
                 local_imgs = local_imgs.to(device)
-                local_classes = local_classes.to(device)
+                
+                # fig = plt.figure()
+                # for i in range(50):
+                #     plt.subplot(5,10,i+1)
+                #     plt.tight_layout()
+                #     plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
+                #     plt.title("Ground Truth: {}".format(local_classes[i]))
+                #     plt.xticks([])
+                #     plt.yticks([])
+                # plt.show()
+                # print(f'local_classes: {local_classes}')
 
-                fig = plt.figure()
-                for i in range(50):
-                    plt.subplot(5,10,i+1)
-                    plt.tight_layout()
-                    plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
-                    plt.title("Ground Truth: {}".format(local_classes[i]))
-                    plt.xticks([])
-                    plt.yticks([])
-                plt.show()
-                print(f'local_classes: local_classes{local_classes}')
+                emb_start_point = iteration * batch_size
+                emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
+                local_translator_emb = local_translator_emb_cache[emb_start_point:emb_end_point]
 
-            # optimise noise
-            if args.generator_type == "vae":
-                # TODO implement vae sample encoding 
-                pass
-
-            elif args.generator_type == "gan":
-                # TODO save embedings for entire dataloader -> optimise them only during the first epoch
-                _, local_translator_emb = gan_experiments.gan_utils.optimize_noise(images=local_imgs, 
-                                                                                    generator=decoder, 
-                                                                                    n_iterations=200, # NOTE parametrise?
-                                                                                    task_id=task_id, 
-                                                                                    lr=0.01,
-                                                                                    labels=local_classes)
-                local_translator_emb = local_translator_emb.detach()
 
             # concat local and generated data
             generations = torch.cat([generations, local_imgs])
@@ -358,6 +371,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
             shuffle = torch.randperm(len(generations))
             generations = generations[shuffle]
             translator_emb = translator_emb[shuffle]
+
 
             for batch_id in range(n_mini_batches):
                 start_point = batch_id * batch_size
@@ -385,10 +399,10 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                                                                                      np.round(np.mean(cosine_distances), 3),
                                                                                      np.round(time.time() - start), 3))
 
-    return feature_extractor
+    return feature_extractor, local_translator_emb_cache
 
 
-def train_head(args, classifier, n_epochs, decoder, task_id, batch_size, 
+def train_head(args, classifier, n_epochs, decoder, task_id, batch_size, local_translator_emb_cache=None,
                train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
     # n_epochs = 1
     wandb.watch(classifier)

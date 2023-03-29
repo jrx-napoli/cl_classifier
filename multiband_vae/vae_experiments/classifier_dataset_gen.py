@@ -23,6 +23,18 @@ def get_dataloader(args, dataset):
             sub_datasets.append(train_subset)
 
             concat_dataset = ConcatDataset(sub_datasets)
-            loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=False))
+            loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=True, drop_last=True))
         
         return loaders
+    
+
+    # fig = plt.figure()
+    # for i in range(50):
+    #     plt.subplot(5,10,i+1)
+    #     plt.tight_layout()
+    #     plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
+    #     plt.title("Ground Truth: {}".format(local_classes[i]))
+    #     plt.xticks([])
+    #     plt.yticks([])
+    # plt.show()
+    # print(f'local_classes: {local_classes}')

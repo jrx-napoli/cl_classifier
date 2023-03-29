@@ -182,25 +182,6 @@ def run(args):
         train_loaders = classifier_dataset_gen.get_dataloader(args=args, dataset=train_dataset)
 
 
-    # for j in range(len(train_loaders[0])):
-    #     local_imgs, local_classes = next(iter(train_loaders[0]))
-    #     local_imgs = local_imgs.to(device)
-    #     local_classes = local_classes.to(device)
-    #     print(torch.unique(local_classes, return_counts=True))
-
-    #     fig = plt.figure()
-    #     for i in range(50):
-    #         plt.subplot(5,10,i+1)
-    #         plt.tight_layout()
-    #         plt.imshow(local_imgs[i][0].cpu(), cmap='gray', interpolation='none')
-    #         plt.title("Ground Truth: {}".format(local_classes[i]))
-    #         plt.xticks([])
-    #         plt.yticks([])
-    #     plt.show()
-    #     print(f'local_classes: {local_classes}')
-
-
-
     for task_id in range(len(task_names)):
 
         if args.final_task_only and task_id != task_names[-1]:
@@ -209,7 +190,7 @@ def run(args):
         print("\n######### Task number {} #########".format(task_id))
         task_name = task_names[task_id]
 
-        train_dataset_loader = train_loaders[task_id]
+        train_dataset_loader = train_loaders[19]
         train_dataset_loader_big = train_loaders_big[task_id]
 
         if args.training_procedure == "multiband":
@@ -236,7 +217,7 @@ def run(args):
                                                                                 feature_extractor=feature_extractor,
                                                                                 classifier=classifier,
                                                                                 train_loader=train_dataset_loader,
-                                                                                task_id=task_id,
+                                                                                task_id=19,
                                                                                 device=device)
         else:
             print("Wrong training procedure")

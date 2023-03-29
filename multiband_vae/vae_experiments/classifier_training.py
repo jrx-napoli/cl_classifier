@@ -9,7 +9,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
         generator_path = f'results/vae/{args.experiment_name}/model{task_id}_curr_decoder'
         generator = torch.load(generator_path).to(device)
     elif args.generator_type == "gan":
-        generator_path = f'results/gan/{args.experiment_name}/model{task_id}_curr_global_generator'
+        generator_path = f'results/gan/{args.experiment_name}/model{19}_curr_global_generator'
         generator = torch.load(generator_path, map_location="cuda")
         generator = generator.to(device)
     else:
@@ -25,7 +25,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
-        feature_extractor = training_functions.train_feature_extractor(args=args,
+        feature_extractor, local_translator_emb_cache = training_functions.train_feature_extractor(args=args,
                                                                        feature_extractor=feature_extractor,
                                                                        train_loader=train_loader,
                                                                        decoder=generator,
@@ -40,6 +40,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
     else:
         print("\nTrain classifier head")
         classifier = training_functions.train_head(args=args,
+                                                   local_translator_emb_cache=local_translator_emb_cache,
                                                     classifier=classifier, 
                                                     n_epochs=args.classifier_epochs,
                                                     decoder=generator,
