@@ -146,12 +146,6 @@ def data_split(dataset, dataset_name, num_batches=5, num_classes=10, random_spli
         if dataset_name in ["omniglot", "doublemnist", "flowers"]:
             one_split = num_classes // num_batches
             batch_split = {i: [list(range(i * one_split, (i + 1) * one_split))] for i in range(num_batches)}
-
-        elif dataset_name == "cifar100":
-            batch_split = {i: [i] for i in range(num_batches)}
-            print(f'\nbatch_split: {batch_split}\n')
-            print(f'\ndataset: {dataset_name}\n')
-
         else:
             batch_split = {i: [i] for i in range(num_batches)}
 
