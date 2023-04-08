@@ -51,9 +51,6 @@ class ClassifierValidator:
 
     def get_correct_sum(self, y_pred, y_test):
         _, y_pred_tag = torch.max(y_pred, 1)
-        # print(y_pred_tag)
-        # print(y_test)
-        # print('+++++++++')
         correct_results_sum = (y_pred_tag == y_test).sum().float()
         return correct_results_sum
 
@@ -61,7 +58,7 @@ class ClassifierValidator:
 def get_global_eval_dataloaders(task_names, val_dataset_splits, args):
     # Eval dataset contains datasets from all previous tasks
     eval_loaders = []
-    for task_id in task_names:
+    for task_id in range(task_names):
         datasets = []
 
         for i in range(task_id + 1):

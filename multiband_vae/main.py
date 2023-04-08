@@ -19,6 +19,8 @@ from vae_experiments import models_definition, classifier_models
 import global_classifier_training
 from visualise import *
 import wandb
+from torch.utils.data import Subset, ConcatDataset
+from vae_experiments import classifier_dataset_gen
 
 
 def run(args):
@@ -103,10 +105,9 @@ def run(args):
             for i, _ in enumerate(x):
                 x[i].append(task)
         
-        global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
-                                                                                val_dataset_splits=val_dataset_splits, 
-                                                                                args=args)
-        print(next(iter(global_eval_dataloaders[-1])))
+        # global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
+        #                                                                         val_dataset_splits=val_dataset_splits, 
+        #                                                                         args=args)
         
 
         # test calssifier's architecture
@@ -176,6 +177,13 @@ def run(args):
     curr_global_decoder = None
     
 
+
+    if args.dataset.lower() == "cifar100":
+        train_loaders, _ = classifier_dataset_gen.get_dataloader(args=args, dataset=train_dataset)
+        val_loaders, val_datasets = classifier_dataset_gen.get_dataloader(args=args, dataset=val_dataset)
+        global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=20, val_dataset_splits=val_datasets, args=args)
+
+
     for task_id in range(len(task_names)):
 
         if args.final_task_only and task_id != task_names[-1]:
@@ -184,7 +192,7 @@ def run(args):
         print("\n######### Task number {} #########".format(task_id))
         task_name = task_names[task_id]
 
-        train_dataset_loader = train_loaders[task_id]
+        train_dataset_loader = train_loaders[19]
         train_dataset_loader_big = train_loaders_big[task_id]
 
         if args.training_procedure == "multiband":
@@ -233,7 +241,7 @@ def run(args):
             # Calculate current accuracy
             correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
                                                     classifier=classifier, 
-                                                    data_loader=global_eval_dataloaders[task_id])             
+                                                    data_loader=global_eval_dataloaders[-1])             
             acc = np.round(100 * correct/total, 3)
             print(f'Global accuracy: {acc} %')
             wandb.log({"Global accuracy": (acc)})
@@ -421,7 +429,7 @@ def get_args(argv):
                         help="Load Feature Extractor")
     parser.add_argument('--gen_load_classifier', default=False, action='store_true',
                         help="Load Classifier")
-    parser.add_argument('--feature_extractor_epochs', default=30, type=int,
+    parser.add_argument('--feature_extractor_epochs', default=40, type=int,
                         help="Feature Extractor training epochs")
     parser.add_argument('--classifier_epochs', default=5, type=int,
                         help="Classifier training epochs")
@@ -433,6 +441,10 @@ def get_args(argv):
                         help="Reset model before every task")
     parser.add_argument('--final_task_only', default=False, action='store_true',
                         help="Reset model before every task")
+    parser.add_argument('--train_on_available_data', default=True, action='store_true',
+                        help="Train on available real samples")
+    parser.add_argument('--wandb_log', default=True, action='store_true',
+                        help="Log training process on wandb")
     
     
 

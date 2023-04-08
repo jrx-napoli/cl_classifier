@@ -80,8 +80,7 @@ def plot_results(experiment_name, curr_global_decoder, class_table, n_tasks, n_i
 
 def generate_images(curr_global_decoder, z, y, return_emb=False, translate_noise=True):
     if return_emb:
-        example, emb = curr_global_decoder(z, y, y, return_emb=return_emb,
-                                           translate_noise=translate_noise)
+        example, emb = curr_global_decoder(z, y, y, return_emb=return_emb, translate_noise=translate_noise)
         return example, emb
     else:
         example = curr_global_decoder(z, y, y, return_emb=return_emb, translate_noise=translate_noise)
