@@ -77,7 +77,7 @@ def combine_models(feature_extractor, classifier):
     )
     return model
 
-def test_architecture(args, feature_extractor, classifier, train_dataset_splits, val_dataset_splits, device, numb_epoch=100, lr=1e-3, scheduler_rate=0.99):
+def test_architecture(args, feature_extractor, classifier, device, numb_epoch=100, lr=1e-3, scheduler_rate=0.99):
 
     model = combine_models(feature_extractor, classifier).to(device)
     model.train()
@@ -88,9 +88,6 @@ def test_architecture(args, feature_extractor, classifier, train_dataset_splits,
     max_accuracy = 0
     wandb.watch(model)
 
-    # train_dl = get_data_loader(train_dataset_splits)
-    # val_dl = get_data_loader(val_dataset_splits)
-    
     train_ds, val_ds = get_dataset(args)
     train_dl, val_dl = get_dataloaders(train_ds, val_ds)
     

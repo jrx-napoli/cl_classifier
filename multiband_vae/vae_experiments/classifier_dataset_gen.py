@@ -4,13 +4,16 @@ from torch.utils.data import Subset, ConcatDataset
 
 
 def get_dataloader(args, dataset):
-
+    
+    n_tasks = None
+    
     if args.dataset.lower() == "cifar100":
-        # split cifar into 20 disjoint tasks, each containing 5 new classes    
+        # split cifar into 20 disjoint tasks, each containing 5 new classes
+        n_tasks = 20
         
         loaders = []
         datasets = []
-        for task_id in range(20):
+        for task_id in range(n_tasks):
 
             sub_datasets = []
             idx = torch.zeros_like(dataset.labels)
@@ -24,11 +27,11 @@ def get_dataloader(args, dataset):
             sub_datasets.append(train_subset)
 
             concat_dataset = ConcatDataset(sub_datasets)
-            # NOTE -> no shuffeling, because of gan noise chache
+            # NOTE -> no shuffeling, because of gan noise cache
             datasets.append(concat_dataset)
             loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=False, drop_last=True))
         
-        return loaders, datasets
+        return loaders, datasets, n_tasks
     
 
     # fig = plt.figure()
