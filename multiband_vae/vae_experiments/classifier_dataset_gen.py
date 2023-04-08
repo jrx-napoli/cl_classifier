@@ -9,6 +9,7 @@ def get_dataloader(args, dataset):
         # split cifar into 20 disjoint tasks, each containing 5 new classes    
         
         loaders = []
+        datasets = []
         for task_id in range(20):
 
             sub_datasets = []
@@ -24,9 +25,10 @@ def get_dataloader(args, dataset):
 
             concat_dataset = ConcatDataset(sub_datasets)
             # NOTE -> no shuffeling, because of gan noise chache
+            datasets.append(concat_dataset)
             loaders.append(data.DataLoader(dataset=concat_dataset, batch_size=args.gen_batch_size, shuffle=False, drop_last=True))
         
-        return loaders
+        return loaders, datasets
     
 
     # fig = plt.figure()

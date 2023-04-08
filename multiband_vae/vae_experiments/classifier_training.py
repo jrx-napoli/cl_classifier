@@ -21,33 +21,36 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
 
     # Classifier training
     if args.gen_load_feature_extractor:
-        feature_extractor = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
+        feature_extractor = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor_BETA').to(device)
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
+        local_translator_emb_cache = torch.load(f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
         feature_extractor, local_translator_emb_cache = training_functions.train_feature_extractor(args=args,
-                                                                       feature_extractor=feature_extractor,
-                                                                       train_loader=train_loader,
-                                                                       decoder=generator,
-                                                                       task_id=task_id,
-                                                                       device=device)
+                                                                                                    feature_extractor=feature_extractor,
+                                                                                                    train_loader=train_loader,
+                                                                                                    local_translator_emb_cache=local_translator_emb_cache,
+                                                                                                    decoder=generator,
+                                                                                                    task_id=task_id,
+                                                                                                    device=device)
         print("Done training feature extractor\n")
         torch.save(feature_extractor, f"results/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor_BETA")
-        torch.save(local_translator_emb_cache, f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
+        # torch.save(local_translator_emb_cache, f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
 
 
     if args.gen_load_classifier:
-        classifier = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier').to(device)
+        classifier = torch.load(f'results/{args.generator_type}/{args.experiment_name}/model{99}_classifier').to(device)
         print("Loaded head")
     else:
         print("\nTrain classifier head")
+        local_translator_emb_cache = torch.load(f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
         classifier = training_functions.train_head(args=args,
                                                    local_translator_emb_cache=local_translator_emb_cache,
-                                                    classifier=classifier, 
-                                                    n_epochs=args.classifier_epochs,
-                                                    decoder=generator,
-                                                    task_id=task_id,
-                                                    batch_size=args.gen_batch_size)
+                                                   train_loader=train_loader,
+                                                   classifier=classifier, 
+                                                   decoder=generator,
+                                                   task_id=task_id,
+                                                   device=device)
         print("Done training classifier head\n")
 
     torch.cuda.empty_cache()

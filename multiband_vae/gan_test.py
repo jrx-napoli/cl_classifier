@@ -5,13 +5,13 @@ from gan_experiments import gan_utils
 from visualise import *
 
 
-task_id = 0
+task_id = 19
 generator = torch.load(f"results/gan/CIFAR100_example/model{task_id}_curr_global_generator", map_location="cuda")
 generator.eval()
 generator.translator.eval()
 
 # class_table = curr_global_decoder.class_table
-n_prev_examples = 56
+n_prev_examples = 400
 # n_prev_examples = int(64 * min(task_id, 5))
 
 with torch.no_grad():
@@ -23,7 +23,6 @@ with torch.no_grad():
         n_prev_examples=n_prev_examples,
         curr_global_generator=generator)
 
-    print(generations.size(), random_noise.size(), classes.size(), translator_emb.size())
     print(classes)
     print(len(classes))
 

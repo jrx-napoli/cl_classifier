@@ -105,9 +105,9 @@ def run(args):
             for i, _ in enumerate(x):
                 x[i].append(task)
         
-        global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
-                                                                                val_dataset_splits=val_dataset_splits, 
-                                                                                args=args)
+        # global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=task_names, 
+        #                                                                         val_dataset_splits=val_dataset_splits, 
+        #                                                                         args=args)
         
 
         # test calssifier's architecture
@@ -179,7 +179,9 @@ def run(args):
 
 
     if args.dataset.lower() == "cifar100":
-        train_loaders = classifier_dataset_gen.get_dataloader(args=args, dataset=train_dataset)
+        train_loaders, _ = classifier_dataset_gen.get_dataloader(args=args, dataset=train_dataset)
+        val_loaders, val_datasets = classifier_dataset_gen.get_dataloader(args=args, dataset=val_dataset)
+        global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=20, val_dataset_splits=val_datasets, args=args)
 
 
     for task_id in range(len(task_names)):
@@ -239,7 +241,7 @@ def run(args):
             # Calculate current accuracy
             correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
                                                     classifier=classifier, 
-                                                    data_loader=global_eval_dataloaders[task_id])             
+                                                    data_loader=global_eval_dataloaders[-1])             
             acc = np.round(100 * correct/total, 3)
             print(f'Global accuracy: {acc} %')
             wandb.log({"Global accuracy": (acc)})
@@ -427,7 +429,7 @@ def get_args(argv):
                         help="Load Feature Extractor")
     parser.add_argument('--gen_load_classifier', default=False, action='store_true',
                         help="Load Classifier")
-    parser.add_argument('--feature_extractor_epochs', default=30, type=int,
+    parser.add_argument('--feature_extractor_epochs', default=40, type=int,
                         help="Feature Extractor training epochs")
     parser.add_argument('--classifier_epochs', default=5, type=int,
                         help="Classifier training epochs")
