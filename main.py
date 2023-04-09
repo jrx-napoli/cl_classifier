@@ -4,17 +4,16 @@ import copy
 import random
 import wandb
 import torch
-import torch.utils.data as data
-from random import shuffle
+import numpy as np
 import matplotlib.pyplot as plt
-import multiband_vae.continual_benchmark.dataloaders.base
+
+import dataset_gen
+import model_definitions
+import training_boot
+import validation
+import utils
+
 import multiband_vae.continual_benchmark.dataloaders as dataloaders
-from multiband_vae.vae_experiments import classifier_utils, resnet
-from multiband_vae.vae_experiments import multiband_training, classifier_training, replay_training, training_functions
-from multiband_vae.vae_experiments import models_definition, classifier_models
-from multiband_vae.global_classifier_training import test_architecture
-from multiband_vae.visualise import *
-from multiband_vae.vae_experiments import classifier_dataset_gen
 
 
 def run(args):
@@ -22,50 +21,48 @@ def run(args):
     if args.log_wandb:
         wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
+
     # Get transformed data
     train_dataset, val_dataset = dataloaders.base.__dict__[args.dataset](args.dataroot, args.skip_normalization, args.train_aug)
 
+
     # Prepare dataloaders
-    train_loaders, train_datasets, n_tasks = classifier_dataset_gen.get_dataloader(args=args, dataset=train_dataset)
-    val_loaders, val_datasets, _ = classifier_dataset_gen.get_dataloader(args=args, dataset=val_dataset)
-    global_eval_dataloaders = classifier_utils.get_global_eval_dataloaders(task_names=20, val_dataset_splits=val_datasets, args=args)
+    train_loaders, train_datasets, n_tasks = dataset_gen.split_data(args=args, dataset=train_dataset)
+    val_loaders, val_datasets, _ = dataset_gen.split_data(args=args, dataset=val_dataset)
+    global_eval_dataloaders = dataset_gen.get_CI_eval_dataloaders(task_names=n_tasks, val_dataset_splits=val_datasets, args=args)
+
 
     # Calculate constants
-    tasks = [i for i in range(n_tasks)]
-    print(tasks)
-    # labels_tasks = {}
-    # for task_name, task in train_dataset_splits.items():
-    #     labels_tasks[int(task_name)] = task.dataset.class_list
+    task_names = [i for i in range(n_tasks)]
+    print(f'Task order: {task_names}')
 
-    # n_tasks = len(labels_tasks)
-    # print(f'labels_tasks: {labels_tasks}')
-    
-    # # Decide split ordering
-    # task_names = sorted(list(task_output_space.keys()), key=int)
-    # print('Task order:', task_names)
-    # if args.rand_split_order:
-    #     shuffle(task_names)
-    #     print('Shuffled task order:', task_names)
 
     # Prepare models
-    input_size = train_dataset[0][0].size()[1]
-    
-    if args.generator_type == "vae":
-        translated_latent_size = args.gen_d * args.gen_latent_size
-    else:
-        translated_latent_size = 100 # fixed latent size for GAN
-    
-    if args.fe_type == "resnet18":
-        feature_extractor = resnet.ResNet18(out_dim=translated_latent_size).to(device)
-    else:
-        feature_extractor = classifier_models.FeatureExtractor(model_type=args.fe_type,
-                                                                latent_size=translated_latent_size,
-                                                                device=device, 
-                                                                in_size=input_size).to(device)
+    input_size = train_dataset[0][0].size()[1]    
+    translated_latent_size = utils.calculate_translated_latent_size(args=args)
 
-    classifier = classifier_models.Head(latent_size=translated_latent_size, device=device).to(device)
+    feature_extractor = model_definitions.create_feature_extractor(model_type=args.model_type, 
+                                                                   device=device, 
+                                                                   latent_size=translated_latent_size, 
+                                                                   in_size=input_size).to(device)
+    classifier = model_definitions.create_classifier(device=device, latent_size=translated_latent_size).to(device)
+    print(f'Prepared models:')
     print(feature_extractor)
     print(classifier)
+
+
+    # Test calssifier's architecture
+    if args.global_benchmark:
+        feature_extractor_copy = copy.deepcopy(feature_extractor)
+        classifier_copy = copy.deepcopy(classifier)
+
+        architecture_validator = validation.OfflineArchitectureValidator()
+        architecture_validator.test_architecture(args=args,
+                                                 feature_extractor=feature_extractor_copy,
+                                                 classifier=classifier_copy,
+                                                 device=device)
+        return
+    
 
     # For classifiers accuracy chart
     global_accuracies = []
@@ -76,18 +73,6 @@ def run(args):
         x.append([])
         for i, _ in enumerate(x):
             x[i].append(task)
-        
-
-    # test calssifier's architecture
-    if args.global_benchmark:
-        feature_extractor_copy = copy.deepcopy(feature_extractor)
-        classifier_copy = copy.deepcopy(classifier)
-        test_architecture(args=args,
-                          feature_extractor=feature_extractor_copy,
-                          classifier=classifier_copy,
-                          device=device)
-        return
-        
 
 
     for task_id in range(n_tasks):
@@ -98,12 +83,12 @@ def run(args):
         print("\n######### Task number {} #########".format(task_id))
 
         train_loader = train_loaders[task_id]
-        feature_extractor, classifier = classifier_training.train_classifier(args=args, 
-                                                                            feature_extractor=feature_extractor,
-                                                                            classifier=classifier,
-                                                                            train_loader=train_loader,
-                                                                            task_id=task_id,
-                                                                            device=device)
+        feature_extractor, classifier = training_boot.train_classifier(args=args, 
+                                                                       feature_extractor=feature_extractor,
+                                                                       classifier=classifier,
+                                                                       train_loader=train_loader,
+                                                                       task_id=task_id,
+                                                                       device=device)
     
         # Save feature extractor and classifier
         if not args.load_feature_extractor:
@@ -114,7 +99,7 @@ def run(args):
 
 
         # Calculate current accuracy
-        cv = classifier_utils.ClassifierValidator()
+        cv = validation.ClassifierValidator()
         correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
                                                 classifier=classifier, 
                                                 data_loader=global_eval_dataloaders[task_id])
@@ -122,6 +107,7 @@ def run(args):
         print(f'Global accuracy: {acc} %')
         wandb.log({"Global accuracy": (acc)})
         global_accuracies.append(acc)
+
 
         # At the end of the training display global accuracy graph 
         if task_id == task_names[-1] and not args.final_task_only:
@@ -133,16 +119,20 @@ def run(args):
             ax.set_ylim([0, 100])
             plt.show()
 
+
         # Validate Feature Extractor on all tasks
         if args.calc_cosine_similarity == True:
-            print(f'\nFeature extractor\'s mean cosine similarity:') 
-            for i in range(task_id + 1):
-                val_dataset_loader = val_loaders[i]
-                result = cv.validate_feature_extractor(encoder=local_vae.encoder, 
-                                                        translator=curr_global_decoder.translator, 
-                                                        feature_extractor=feature_extractor, 
-                                                        data_loader=val_dataset_loader)
-                print(f'Task {i}: {result}')
+            # TODO -> implement for both GAN and VAE
+            # print(f'\nFeature extractor\'s mean cosine similarity:') 
+            # for i in range(task_id + 1):
+            #     val_dataset_loader = val_loaders[i]
+            #     result = cv.validate_feature_extractor(encoder=local_vae.encoder, 
+            #                                             translator=curr_global_decoder.translator, 
+            #                                             feature_extractor=feature_extractor, 
+            #                                             data_loader=val_dataset_loader)
+            #     print(f'Task {i}: {result}')
+            pass
+    
     
         # Validate Classifer on all tasks
         for i in range(task_id + 1):
