@@ -11,7 +11,15 @@ def calculate_translated_latent_size(args):
     else:
         raise NotImplementedError
 
-
+def prepare_accuracy_data(n_tasks):
+    x = []
+    accuracy = []
+    for task in range(n_tasks):
+        accuracy.append([])
+        x.append([])
+        for i, _ in enumerate(x):
+            x[i].append(task)
+    return x, accuracy
 
     # fig = plt.figure()
     # for i in range(50):

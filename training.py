@@ -14,24 +14,29 @@ torch.autograd.set_detect_anomaly(True)
 
 def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                             local_translator_emb_cache=None, train_loader=None, local_start_lr=0.001, scheduler_rate=0.99):
-    wandb.watch(feature_extractor)
+    if args.log_wandb:
+        wandb.watch(feature_extractor)
     feature_extractor.train()
     decoder.translator.eval()
     decoder.eval()
 
     n_epochs = args.feature_extractor_epochs
-    batch_size = args.gen_batch_size
+    batch_size = args.batch_size
 
     if train_loader:
         n_iterations = len(train_loader)
-        n_prev_examples = int(batch_size * min(task_id, 7))
+        n_prev_examples = int(batch_size * min(task_id, 10))
         n_tasks = task_id
     else:
         n_iterations = 100 # TODO parametrise this
-        n_prev_examples = int(batch_size * min(task_id + 1, 7))
+        n_prev_examples = int(batch_size * min(task_id + 1, 10))
         n_tasks = task_id + 1
     lr = local_start_lr
 
+    if train_head:
+        print(f'Training on currently available data')
+    else:
+        print(f'Training on generations only')
     print(f'Iterations: {n_iterations}')
     print(f'Generations per iteration: {n_prev_examples}')
     print(f"Feature extractor's lr set to: {lr}")
@@ -57,7 +62,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 _, local_translator_emb = gan_utils.optimize_noise(images=local_imgs, 
                                                          generator=decoder, 
                                                          n_iterations=500,
-                                                         task_id=task_id, # NOTE task_id does not matter in this implementation
+                                                         task_id=task_id, # NOTE task_id does not matter in current implementation
                                                          lr=0.01,
                                                          labels=local_classes)
                 local_translator_emb = local_translator_emb.detach()
@@ -67,15 +72,14 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 else:
                     local_translator_emb_cache = torch.cat((local_translator_emb_cache, local_translator_emb), 0)
                 
-            torch.save(local_translator_emb_cache, f"results/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache_BETA")
+            torch.save(local_translator_emb_cache, f"models/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache")
                 
 
         for iteration, batch in enumerate(train_loader):
 
             # local data
-            local_imgs, local_classes = batch
+            local_imgs, _ = batch
             local_imgs = local_imgs.to(device)
-            # local_classes = local_classes.to(device)
 
             emb_start_point = iteration * batch_size
             emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
@@ -96,19 +100,16 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
 
                 elif args.generator_type == "gan":
                     # TODO bugfix: number of generations is rounded down
-                    generations, _, classes, translator_emb = gan_utils.generate_previous_data(
+                    generations, _, _, translator_emb = gan_utils.generate_previous_data(
                         n_prev_tasks=(5*n_tasks), # TODO adjust for cifar100 example - x5 for 20 tasks?
                         n_prev_examples=n_prev_examples,
                         curr_global_generator=decoder)
                 
                 generations = generations.to(device)
 
-
             # concat local and generated data
             generations = torch.cat([generations, local_imgs])
             translator_emb = torch.cat([translator_emb, local_translator_emb])
-            # classes = torch.cat([classes, local_classes])
-            # print(torch.unique(classes, return_counts=True))
 
             # shuffle
             n_mini_batches = math.ceil(len(generations) / batch_size)
@@ -146,23 +147,24 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
     return feature_extractor, local_translator_emb_cache
 
 
-def train_head(args, classifier, decoder, task_id, device, train_loader=None, local_translator_emb_cache=None,
-               train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
-    wandb.watch(classifier)
+def train_head(args, classifier, decoder, task_id, device, 
+               train_loader=None, local_translator_emb_cache=None, train_same_z=False, local_start_lr=0.001, scheduler_rate=0.99):
+    if args.log_wandb:
+        wandb.watch(classifier)
     decoder.translator.eval()
     decoder.eval()
     classifier.train()
 
     n_epochs = args.classifier_epochs
-    batch_size = args.gen_batch_size
+    batch_size = args.batch_size
 
     if train_loader:
         n_iterations = len(train_loader)
-        n_prev_examples = int(batch_size * min(task_id, 2))
+        n_prev_examples = int(batch_size * min(task_id, 10))
         n_tasks = task_id
     else:
         n_iterations = 100 # TODO parametrise this
-        n_prev_examples = int(batch_size * min(task_id + 1, 2))
+        n_prev_examples = int(batch_size * min(task_id + 1, 10))
         n_tasks = task_id + 1
     lr = local_start_lr
 

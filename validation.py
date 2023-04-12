@@ -42,24 +42,24 @@ class ClassifierValidator:
         feature_extractor.eval()
         classifier.eval()
 
-        with torch.no_grad():
-            for iteration, batch in enumerate(data_loader):
+        # with torch.no_grad():
+        for iteration, batch in enumerate(data_loader):
 
-                x = batch[0].to(classifier.device)
-                y = batch[1].to(classifier.device)
+            x = batch[0].to(classifier.device)
+            y = batch[1].to(classifier.device)
 
-                extracted = feature_extractor(x)
-                out = classifier(extracted)
-                correct_sum = self.get_correct_sum(out, y)
-                
-                correct += correct_sum.item()
-                total += y.shape[0]
+            extracted = feature_extractor(x)
+            out = classifier(extracted)
+            correct_sum = self.get_correct_sum(out, y)
+            
+            correct += correct_sum.item()
+            total += y.shape[0]
 
         return correct, total
 
     def get_correct_sum(self, y_pred, y_test):
         _, y_pred_tag = torch.max(y_pred, 1)
-        correct_results_sum = (y_pred_tag == y_test).sum().float()
+        correct_results_sum = torch.sum(y_pred_tag == y_test)
         return correct_results_sum
 
 
@@ -93,22 +93,23 @@ class OfflineArchitectureValidator:
         return data_loader
 
     def get_dataset(self, args):
-        normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for  28x28
+        # normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for  28x28
         # normalize = transforms.Normalize(mean=(0.1000,), std=(0.2752,))  # for 32x32
+        normalize = transforms.Normalize(mean=[0.5], std=[0.5])
 
         transform = transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])
 
-        train_dataset = torchvision.datasets.FashionMNIST(
+        train_dataset = torchvision.datasets.CIFAR100(
             root=args.dataroot,
             train=True,
             download=True,
             transform=transform
         )
 
-        val_dataset = torchvision.datasets.FashionMNIST(
+        val_dataset = torchvision.datasets.CIFAR100(
             root=args.dataroot,
             train=False,
             download=True,
@@ -117,9 +118,9 @@ class OfflineArchitectureValidator:
 
         return train_dataset, val_dataset
 
-    def get_dataloaders(self, train_dataset, val_dataset):
-        train_data_loader = data.DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
-        val_data_loader = data.DataLoader(dataset=val_dataset, batch_size=64, shuffle=False)
+    def get_dataloaders(self, train_dataset, val_dataset, batch_size):
+        train_data_loader = data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+        val_data_loader = data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
         return train_data_loader, val_data_loader
 
     def count_correct(self, pred, labels):
@@ -143,10 +144,11 @@ class OfflineArchitectureValidator:
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_rate)
         accuracies = []
         max_accuracy = 0
-        wandb.watch(model)
+        if args.log_wandb:
+            wandb.watch(model)
 
         train_ds, val_ds = self.get_dataset(args)
-        train_dl, val_dl = self.get_dataloaders(train_ds, val_ds)
+        train_dl, val_dl = self.get_dataloaders(train_ds, val_ds, batch_size=args.batch_size)
         
         for epoch in range(numb_epoch):
             losses = []
@@ -177,18 +179,19 @@ class OfflineArchitectureValidator:
                 # test split accuracy
                 accuracy = float(self.validate(model, val_dl))
                 accuracies.append(accuracy)
-                print(f'test-accuracy: {np.round(accuracy, 3)} %')
-                wandb.log({"Test-split accuracy: ": (np.round(accuracy, 3))})
+                print(f'Test-accuracy: {np.round(accuracy, 3)} %')
+                if args.log_wandb:
+                    wandb.log({"Test-split accuracy: ": (np.round(accuracy, 3))})
 
                 if accuracy > max_accuracy:
                     best_model = copy.deepcopy(model)
                     max_accuracy = accuracy
                     print(f'New best test-split accuracy: {np.round(accuracy, 3)} %')
-                    wandb.log({"Best test-split accuracy: ": (np.round(accuracy, 3))})
+                    if args.log_wandb:
+                        wandb.log({"Best test-split accuracy: ": (np.round(accuracy, 3))})
 
             
             scheduler.step()
             
-        plt.plot(accuracies)
         print(f'Best accuracy: {max_accuracy}')
         return best_model

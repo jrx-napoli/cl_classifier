@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 import resnet
 
 
@@ -61,7 +62,8 @@ class FeatureExtractor(nn.Module):
 
 def create_feature_extractor(model_type, device, latent_size, in_size):
     if model_type == "resnet18":
-        return resnet.ResNet18(out_dim=latent_size).to(device)
+        return torchvision.models.resnet18(pretrained=False, num_classes=latent_size).to(device)
+        # return resnet.ResNet18(out_dim=latent_size).to(device)
     else:
         return FeatureExtractor(model_type=model_type,
                                 latent_size=latent_size,
