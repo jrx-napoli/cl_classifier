@@ -73,7 +73,6 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                     local_translator_emb_cache = torch.cat((local_translator_emb_cache, local_translator_emb), 0)
                 
             torch.save(local_translator_emb_cache, f"models/{args.generator_type}/{args.experiment_name}/local_translator_emb_cache")
-                
 
         for iteration, batch in enumerate(train_loader):
 
@@ -143,6 +142,9 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                                                                                      np.round(np.mean(losses), 3),
                                                                                      np.round(np.mean(cosine_distances), 3),
                                                                                      np.round(time.time() - start), 3))
+            
+        if epoch % 9 == 0 and epoch != 0:
+            torch.save(feature_extractor, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor_epoch_{epoch}")
 
     return feature_extractor, local_translator_emb_cache
 

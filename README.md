@@ -45,5 +45,5 @@ python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 -
 
 #### CIFAR100
 ```
-python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 --batch_size 256 --gen_d=50 --gen_latent_size 32 --seed 13 --fe_type resnet18 --feature_extractor_epochs 60 --generator_type gan --final_task_only --train_on_available_data --log_wandb
+python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 --seed 13 --batch_size 256 --fe_type preact-resnet32 --depth 32 --num_classes 100 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_on_available_data --train_aug --log_wandb
 ```

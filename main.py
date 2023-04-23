@@ -13,52 +13,49 @@ import training_boot
 import validation
 import utils
 
-import multiband_vae.continual_benchmark.dataloaders.base
-import multiband_vae.continual_benchmark.dataloaders as dataloaders
+
+# import multiband_vae.continual_benchmark.dataloaders.base
+# import multiband_vae.continual_benchmark.dataloaders as dataloaders
 
 
 def run(args):
-
     if args.log_wandb:
         wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
-
     # Get transformed data
-    train_dataset, val_dataset = dataloaders.base.__dict__[args.dataset](args.dataroot, args.skip_normalization, args.train_aug)
-
+    # train_dataset, val_dataset = dataloaders.base.__dict__[args.dataset](args.dataroot, args.skip_normalization, args.train_aug)
+    train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot, args.skip_normalization,
+                                                                    args.train_aug)
 
     # Prepare dataloaders
     train_loaders, train_datasets, n_tasks = dataset_gen.split_data(args=args, dataset=train_dataset, drop_last=True)
     val_loaders, val_datasets, _ = dataset_gen.split_data(args=args, dataset=val_dataset, drop_last=False)
-    global_eval_dataloaders = dataset_gen.create_CI_eval_dataloaders(task_names=n_tasks, val_dataset_splits=val_datasets, args=args)
+    ci_eval_dataloaders = dataset_gen.create_CI_eval_dataloaders(n_tasks=n_tasks, val_dataset_splits=val_datasets,
+                                                                 args=args)
     # TODO add 1 class only eval datasets
-
 
     # Calculate constants
     task_names = [i for i in range(n_tasks)]
     print(f'\nTask order: {task_names}')
 
-
     # Accuracy tracking
     global_accuracies = []
     x, accuracy = utils.prepare_accuracy_data(n_tasks=n_tasks)
 
-
     # Prepare models
-    input_size = train_dataset[0][0].size()[1]    
+    input_size = train_dataset[0][0].size()[1]
     translated_latent_size = utils.calculate_translated_latent_size(args=args)
 
-    feature_extractor = model_definitions.create_feature_extractor(model_type=args.fe_type, 
-                                                                   device=device, 
-                                                                   latent_size=translated_latent_size, 
-                                                                   in_size=input_size).to(device)
+    feature_extractor = model_definitions.create_feature_extractor(device=device,
+                                                                   latent_size=translated_latent_size,
+                                                                   in_size=input_size,
+                                                                   args=args).to(device)
     classifier = model_definitions.create_classifier(device=device, latent_size=translated_latent_size).to(device)
     print(f'\nPrepared models:')
     print(feature_extractor)
     print(classifier)
 
-
-    # Test calssifier's architecture
+    # Test classifier's architecture
     if args.global_benchmark:
         print(f'\nRunning offline benchamrk:')
         feature_extractor_copy = copy.deepcopy(feature_extractor)
@@ -71,10 +68,11 @@ def run(args):
                                                  device=device)
         return
 
-
+    # Experiment loop
     for task_id in range(n_tasks):
-        if args.final_task_only and task_id != (n_tasks-1):
-            # skip all non final tasks
+
+        # skip all non final tasks
+        if args.final_task_only and task_id != (n_tasks - 1):
             continue
 
         if args.train_on_available_data:
@@ -83,32 +81,31 @@ def run(args):
             train_loader = None
 
         print("\n######### Task number {} #########".format(task_id))
-        feature_extractor, classifier = training_boot.train_classifier(args=args, 
+        feature_extractor, classifier = training_boot.train_classifier(args=args,
                                                                        feature_extractor=feature_extractor,
                                                                        classifier=classifier,
                                                                        train_loader=train_loader,
                                                                        task_id=task_id,
                                                                        device=device)
-    
+
         # Save feature extractor and classifier
         if not args.load_feature_extractor:
-            torch.save(feature_extractor, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
-        
+            torch.save(feature_extractor,
+                       f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
+
         if not args.load_classifier:
             torch.save(classifier, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 
-
         # Calculate current accuracy
         cv = validation.ClassifierValidator()
-        correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
-                                                classifier=classifier, 
-                                                data_loader=global_eval_dataloaders[task_id])
-        acc = np.round(100 * correct/total, 3)
+        correct, total = cv.validate_classifier(feature_extractor=feature_extractor,
+                                                classifier=classifier,
+                                                data_loader=ci_eval_dataloaders[task_id])
+        acc = np.round(100 * correct / total, 3)
         print(f'Global accuracy: {acc} %')
         if args.log_wandb:
             wandb.log({"Global accuracy": (acc)})
         global_accuracies.append(acc)
-
 
         # At the end of the training display global accuracy graph 
         if task_id == task_names[-1] and not args.final_task_only:
@@ -119,7 +116,6 @@ def run(args):
             ax = plt.gca()
             ax.set_ylim([0, 100])
             plt.show()
-
 
         # Validate Feature Extractor on all tasks
         if args.calc_cosine_similarity == True:
@@ -133,18 +129,16 @@ def run(args):
             #                                             data_loader=val_dataset_loader)
             #     print(f'Task {i}: {result}')
             pass
-    
-    
+
         # Validate Classifer on all tasks
         for i in range(task_id + 1):
             val_dataset_loader = val_loaders[i]
-            correct, total = cv.validate_classifier(feature_extractor=feature_extractor, 
-                                                    classifier=classifier, 
+            correct, total = cv.validate_classifier(feature_extractor=feature_extractor,
+                                                    classifier=classifier,
                                                     data_loader=val_dataset_loader)
-            acc = np.round(100 * correct/total, 3)
+            acc = np.round(100 * correct / total, 3)
             print(f'Task {i}: {correct}/{total} ({acc} %)')
             accuracy[i].append(acc)
-
 
         # At the end of the training display per-task accuracy graph
         if task_id == task_names[-1] and not args.final_task_only:
@@ -158,7 +152,7 @@ def run(args):
             plt.xlabel("Task id")
             plt.ylabel("Accuracy")
             plt.show()
-    
+
     return
 
 
@@ -171,27 +165,56 @@ def get_args(argv):
                         help="Random seed. If defined all random operations will be reproducible")
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
                         help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
+    parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
+
+    parser.add_argument('--optimiser', default='Adam', choices=['Adam', 'SGD'], help='Optimiser types')
+    parser.add_argument('--skip_normalization', default=False, action='store_true',
+                        help='Loads dataset without normalization')
+    parser.add_argument('--regularization', type=str, default='none', choices=['none', 'cutmix'],
+                        help='Regularization types')
+    parser.add_argument('--train_aug', default=False, action='store_true',
+                        help="Allow data augmentation during training")
     parser.add_argument('--gen_latent_size', type=int, default=10, help="Latent size in VAE")
     parser.add_argument('--gen_d', type=int, default=8, help="Size of binary autoencoder")
-    parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
-    parser.add_argument('--skip_normalization', action='store_true', help='Loads dataset without normalization')
-    parser.add_argument('--train_aug', dest='train_aug', default=False, action='store_true',
-                        help="Allow data augmentation during training")
-
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--generator_type', type=str, default="vae", help='vae|gan')
-    parser.add_argument('--fe_type', type=str, default="mlp400", help='mlp400|conv|resnet18')
+    parser.add_argument('--fe_type', type=str, default="mlp400", help='mlp400|conv|resnet18|preact-resnet32')
+    parser.add_argument('--depth', type=int, default=32, help='Depth of a PreAct-Resnet model')
     parser.add_argument('--load_feature_extractor', default=False, action='store_true', help="Load Feature Extractor")
     parser.add_argument('--load_classifier', default=False, action='store_true', help="Load Classifier")
     parser.add_argument('--feature_extractor_epochs', default=30, type=int, help="Feature Extractor training epochs")
     parser.add_argument('--classifier_epochs', default=5, type=int, help="Classifier training epochs")
-    parser.add_argument('--global_benchmark', default=False, action='store_true', help="Train a global classifier as a benchmark model")
-    parser.add_argument('--calc_cosine_similarity', default=False, action='store_true', help="Validate feature extractors cosine similarity")
+    parser.add_argument('--global_benchmark', default=False, action='store_true',
+                        help="Train a global classifier as a benchmark model")
+    parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',
+                        help="Validate feature extractors cosine similarity")
+    parser.add_argument('--calc_noise', default=False, action='store_true',
+                        help="Calculate optimised GAN noise")
     parser.add_argument('--reset_model', default=False, action='store_true', help="Reset model before every task")
     parser.add_argument('--final_task_only', default=False, action='store_true', help="Reset model before every task")
-    parser.add_argument('--train_on_available_data', default=False, action='store_true', help="Train on available real samples")
+    parser.add_argument('--train_on_available_data', default=True, action='store_true',
+                        help="Train on available real samples")
+    parser.add_argument('--in_channels', default=3, type=int, help="Number of data channels")
+    parser.add_argument('--num_classes', default=0, type=int, help="Number of classes")
     parser.add_argument('--log_wandb', default=False, action='store_true', help="Log training process on wandb")
-    
+
+    # resnet parameters
+    parser.add_argument('--activetype', default='ReLU',
+                        choices=['ReLU6', 'LeakyReLU', 'PReLU', 'ReLU', 'ELU', 'Softplus', 'SELU', 'None'],
+                        help='Activation types')
+    parser.add_argument('--pooltype', type=str, default='MaxPool2d',
+                        choices=['MaxPool2d', 'AvgPool2d', 'adaptive_max_pool2d', 'adaptive_avg_pool2d'],
+                        help='Pooling types')
+    parser.add_argument('--normtype', type=str, default='BatchNorm', choices=['BatchNorm', 'InstanceNorm'],
+                        help='Batch normalization types')
+    parser.add_argument('--preact', action="store_true", default=False,
+                        help='Places norms and activations before linear/conv layer. Set to False by default')
+    parser.add_argument('--bn', action="store_false", default=True, help='Apply Batchnorm. Set to True by default')
+    parser.add_argument('--affine_bn', action="store_false", default=True,
+                        help='Apply affine transform in BN. Set to True by default')
+    parser.add_argument('--bn_eps', type=float, default=1e-6, help='Affine transform for batch norm')
+    parser.add_argument('--compression', type=float, default=0.5, help='DenseNet BC hyperparam')
+
     args = parser.parse_args(argv)
 
     return args

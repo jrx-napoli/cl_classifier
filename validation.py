@@ -57,6 +57,7 @@ class ClassifierValidator:
 
         return correct, total
 
+
     def get_correct_sum(self, y_pred, y_test):
         _, y_pred_tag = torch.max(y_pred, 1)
         correct_results_sum = torch.sum(y_pred_tag == y_test)

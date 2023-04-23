@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+
+import preact_resnet
 import resnet
 
 
@@ -38,7 +40,6 @@ class FeatureExtractor(nn.Module):
             self.fc_2 = nn.Linear(1024, 512)
             self.fc_3 = nn.Linear(512, self.latent_size)
 
-
     def forward(self, x):
         if self.model_type == 'mlp400':
             x = x.view(x.size(0), -1)
@@ -60,15 +61,19 @@ class FeatureExtractor(nn.Module):
 
         return x
 
-def create_feature_extractor(model_type, device, latent_size, in_size):
-    if model_type == "resnet18":
+
+def create_feature_extractor(device, latent_size, in_size, args):
+    if args.fe_type == "resnet18":
+        # TODO -> switch to GDumb implementation of resnet18
         return torchvision.models.resnet18(pretrained=False, num_classes=latent_size).to(device)
-        # return resnet.ResNet18(out_dim=latent_size).to(device)
+    elif args.fe_type == "preact-resnet32":
+        return preact_resnet.ResNet(opt=args).to(device)
     else:
-        return FeatureExtractor(model_type=model_type,
+        return FeatureExtractor(model_type=args.fe_type,
                                 latent_size=latent_size,
                                 device=device, 
                                 in_size=in_size).to(device)
+
 
 def create_classifier(device, latent_size):
     return Head(latent_size=latent_size, device=device)

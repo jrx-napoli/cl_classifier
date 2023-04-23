@@ -388,7 +388,7 @@ def LSUN(dataroot, skip_normalization=False, train_aug=False):
     return train_dataset, val_dataset
 
 
-def CIFAR100(dataroot, skip_normalization=False, train_aug=False):
+def CIFAR100(dataroot, skip_normalization=False, train_aug=True):
     # normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
     normalize = transforms.Normalize(mean=[0.5], std=[0.5])
 
@@ -403,10 +403,11 @@ def CIFAR100(dataroot, skip_normalization=False, train_aug=False):
         ])
 
     train_transform = val_transform
-    if train_aug:
-        train_transform = transforms.Compose([
+    # if train_aug:
+    train_transform = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(degrees=(-30, 30)),
             transforms.ToTensor(),
             normalize,
         ])
