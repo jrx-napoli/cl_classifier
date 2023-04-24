@@ -3,7 +3,6 @@ import training
 
 
 def train_classifier(args, feature_extractor, classifier, train_loader, task_id, device):
-
     # Load the generator
     if args.generator_type == "vae":
         generator_path = f'models/vae/{args.experiment_name}/model{task_id}_curr_decoder'
@@ -32,7 +31,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
         feature_extractor, noise_cache = training.train_feature_extractor(args=args,
                                                                           feature_extractor=feature_extractor,
                                                                           train_loader=train_loader,
-                                                                          local_translator_emb_cache=noise_cache,
+                                                                          noise_cache=noise_cache,
                                                                           decoder=generator,
                                                                           task_id=task_id,
                                                                           device=device)
@@ -41,17 +40,18 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                    f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
 
     if args.load_classifier:
-        classifier = torch.load(f'models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier').to(device)
+        classifier = torch.load(f'models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier').to(
+            device)
         print("Loaded classifier")
     else:
         print("\nTrain classifier")
-        classifier = training.train_head(args=args,
-                                         classifier=classifier,
-                                         train_loader=train_loader,
-                                         local_translator_emb_cache=noise_cache,
-                                         decoder=generator,
-                                         task_id=task_id,
-                                         device=device)
+        classifier = training.train_classifier(args=args,
+                                               classifier=classifier,
+                                               train_loader=train_loader,
+                                               local_translator_emb_cache=noise_cache,
+                                               decoder=generator,
+                                               task_id=task_id,
+                                               device=device)
         print("Done training classifier head\n")
         torch.save(classifier, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 

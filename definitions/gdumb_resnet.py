@@ -1,5 +1,5 @@
 import torch.nn as nn
-from gdumb_resnet_layers import ConvBlock, InitialBlock, FinalBlock
+from definitions.gdumb_resnet_layers import ConvBlock, InitialBlock, FinalBlock
 
 
 class BasicBlock(nn.Module):

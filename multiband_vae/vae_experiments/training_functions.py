@@ -9,7 +9,7 @@ from torch.distributions.utils import logits_to_probs
 from vae_experiments.lap_loss import LapLoss
 from vae_experiments.latent_visualise import Visualizer
 from vae_experiments.vae_utils import *
-import multiband_gan.gan_experiments.gan_utils
+import gan_experiments.gan_utils
 import copy
 import wandb
 
@@ -301,12 +301,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
                 local_imgs, local_classes = batch
                 local_imgs = local_imgs.to(device)
                 local_classes = local_classes.to(device)
-                _, local_translator_emb = multiband_gan.gan_experiments.gan_utils.optimize_noise(images=local_imgs,
-                                                                                                 generator=decoder,
-                                                                                                 n_iterations=500,
-                                                                                                 task_id=task_id,  # NOTE task_id does not matter in this implementation
-                                                                                                 lr=0.01,
-                                                                                                 labels=local_classes)
+                _, local_translator_emb = gan_experiments.gan_utils.optimize_noise(images=local_imgs,
+                                                                                   generator=decoder,
+                                                                                   n_iterations=500,
+                                                                                   task_id=task_id,  # NOTE task_id does not matter in this implementation
+                                                                                   lr=0.01,
+                                                                                   labels=local_classes)
                 local_translator_emb = local_translator_emb.detach()
 
                 if local_translator_emb_cache == None:
@@ -343,7 +343,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device,
 
                 elif args.generator_type == "gan":
                     # TODO bugfix: number of generations is rounded down
-                    generations, _, classes, translator_emb = multiband_gan.gan_experiments.gan_utils.generate_previous_data(
+                    generations, _, classes, translator_emb = gan_experiments.gan_utils.generate_previous_data(
                         n_prev_tasks=(5*n_tasks), # TODO adjust for cifar100 example - x5 for 20 tasks?
                         n_prev_examples=n_prev_examples,
                         curr_global_generator=decoder)
@@ -449,7 +449,7 @@ def train_head(args, classifier, decoder, task_id, device, train_loader=None, lo
                     same_z=False)
 
             elif args.generator_type == "gan":
-                _, _, classes, translator_emb = multiband_gan.gan_experiments.gan_utils.generate_previous_data(
+                _, _, classes, translator_emb = gan_experiments.gan_utils.generate_previous_data(
                     n_prev_tasks=(5*n_tasks),
                     n_prev_examples=n_prev_examples,
                     curr_global_generator=decoder)
