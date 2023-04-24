@@ -1,5 +1,5 @@
 import torch.nn as nn
-from layers import ConvBlock, InitialBlock, FinalBlock
+from gdumb_resnet_layers import ConvBlock, InitialBlock, FinalBlock
 
 
 class BasicBlock(nn.Module):
@@ -9,8 +9,10 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
         self.downsample = downsample
         expansion = 1
-        self.conv1 = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.conv2 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels*expansion, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
+        self.conv2 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels * expansion, kernel_size=3,
+                               stride=1, padding=1, bias=False)
 
     def forward(self, x):
         _out = self.conv1(x)
@@ -29,9 +31,12 @@ class BottleneckBlock(nn.Module):
     def __init__(self, opt, inChannels, outChannels, stride=1, downsample=None):
         super(BottleneckBlock, self).__init__()
         expansion = 4
-        self.conv1 = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv2 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.conv3 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels*expansion, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels, kernel_size=1, stride=1,
+                               padding=0, bias=False)
+        self.conv2 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
+        self.conv3 = ConvBlock(opt=opt, in_channels=outChannels, out_channels=outChannels * expansion, kernel_size=1,
+                               stride=1, padding=0, bias=False)
         self.downsample = downsample
 
     def forward(self, x):
@@ -50,7 +55,8 @@ class ResidualBlock(nn.Module):
     def __init__(self, opt, block, inChannels, outChannels, depth, stride=1):
         super(ResidualBlock, self).__init__()
         if stride != 1 or inChannels != outChannels * block.expansion:
-            downsample = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels* block.expansion, kernel_size=1, stride=stride, padding=0, bias=False)
+            downsample = ConvBlock(opt=opt, in_channels=inChannels, out_channels=outChannels * block.expansion,
+                                   kernel_size=1, stride=stride, padding=0, bias=False)
         else:
             downsample = None
         self.blocks = nn.Sequential()
@@ -91,33 +97,40 @@ class ResNet(nn.Module):
             assert (depth in [18, 34])
             num_blocks = [2, 2, 2, 2] if depth == 18 else [3, 4, 6, 3]
             block = BasicBlock
-            in_planes, out_planes = 64, 512 #20, 160
-        elif blocktype  == 'BottleneckBlock' and self.nettype == 'imagenet':
+            in_planes, out_planes = 64, 512  # 20, 160
+        elif blocktype == 'BottleneckBlock' and self.nettype == 'imagenet':
             assert (depth in [50, 101, 152])
-            if depth == 50: num_blocks = [3, 4, 6, 3]
-            elif depth == 101: num_blocks = [3, 4, 23, 3]
-            elif depth == 152: num_blocks = [3, 8, 36, 3]
+            if depth == 50:
+                num_blocks = [3, 4, 6, 3]
+            elif depth == 101:
+                num_blocks = [3, 4, 23, 3]
+            elif depth == 152:
+                num_blocks = [3, 8, 36, 3]
             block = BottleneckBlock
             in_planes, out_planes = 64, 512
         else:
-            assert(1 == 2)
+            assert (1 == 2)
 
         # self.num_classes = opt.num_classes
         self.initial = InitialBlock(opt=opt, out_channels=in_planes, kernel_size=3, stride=1, padding=1)
         if self.nettype == 'cifar':
             self.group1 = ResidualBlock(opt, block, 16, 16, n, stride=1)
-            self.group2 = ResidualBlock(opt, block, 16*block.expansion, 32, n, stride=2)
-            self.group3 = ResidualBlock(opt, block, 32*block.expansion, 64, n, stride=2)
+            self.group2 = ResidualBlock(opt, block, 16 * block.expansion, 32, n, stride=2)
+            self.group3 = ResidualBlock(opt, block, 32 * block.expansion, 64, n, stride=2)
         elif self.nettype == 'imagenet':
-            self.group1 = ResidualBlock(opt, block, 64, 64, num_blocks[0], stride=1) #For ResNet-S, convert this to 20,20
-            self.group2 = ResidualBlock(opt, block, 64*block.expansion, 128, num_blocks[1], stride=2) #For ResNet-S, convert this to 20,40
-            self.group3 = ResidualBlock(opt, block, 128*block.expansion, 256, num_blocks[2], stride=2) #For ResNet-S, convert this to 40,80
-            self.group4 = ResidualBlock(opt, block, 256*block.expansion, 512, num_blocks[3], stride=2) #For ResNet-S, convert this to 80,160
+            self.group1 = ResidualBlock(opt, block, 64, 64, num_blocks[0],
+                                        stride=1)  # For ResNet-S, convert this to 20,20
+            self.group2 = ResidualBlock(opt, block, 64 * block.expansion, 128, num_blocks[1],
+                                        stride=2)  # For ResNet-S, convert this to 20,40
+            self.group3 = ResidualBlock(opt, block, 128 * block.expansion, 256, num_blocks[2],
+                                        stride=2)  # For ResNet-S, convert this to 40,80
+            self.group4 = ResidualBlock(opt, block, 256 * block.expansion, 512, num_blocks[3],
+                                        stride=2)  # For ResNet-S, convert this to 80,160
         else:
-            assert(1==2)
+            assert (1 == 2)
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.dim_out = out_planes*block.expansion
-        self.final = FinalBlock(opt=opt, in_channels=out_planes*block.expansion)
+        self.dim_out = out_planes * block.expansion
+        self.final = FinalBlock(opt=opt, in_channels=out_planes * block.expansion)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

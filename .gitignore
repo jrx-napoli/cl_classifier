@@ -4,3 +4,5 @@ multiband_vae/data
 data
 mnist_data
 models
+.vscode
+wandb

@@ -1,13 +1,8 @@
-import torch
-import numpy as np
-import torch.utils.data as data
-
-
 def calculate_translated_latent_size(args):
     if args.generator_type == "vae":
         return args.gen_d * args.gen_latent_size
     elif args.generator_type == "gan":
-        return 100  # NOTE -> fixed latent size for GAN
+        return 100
     else:
         raise NotImplementedError
 

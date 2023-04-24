@@ -3,6 +3,7 @@ import training
 
 
 def train_classifier(args, feature_extractor, classifier, train_loader, task_id, device):
+
     # Load the generator
     if args.generator_type == "vae":
         generator_path = f'models/vae/{args.experiment_name}/model{task_id}_curr_decoder'
@@ -17,7 +18,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
     print(f'Loaded generator')
 
     # Classifier training
-    if args.generator_type == "gan" and args.calc_noise:
+    if args.calc_noise:
         noise_cache = None
     else:
         noise_cache = torch.load(f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_noise_cache")
@@ -41,9 +42,9 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
 
     if args.load_classifier:
         classifier = torch.load(f'models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier').to(device)
-        print("Loaded head")
+        print("Loaded classifier")
     else:
-        print("\nTrain classifier head")
+        print("\nTrain classifier")
         classifier = training.train_head(args=args,
                                          classifier=classifier,
                                          train_loader=train_loader,
@@ -52,6 +53,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                                          task_id=task_id,
                                          device=device)
         print("Done training classifier head\n")
+        torch.save(classifier, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
 
     torch.cuda.empty_cache()
     return feature_extractor, classifier

@@ -1,0 +1,67 @@
+import argparse
+
+
+def get_args(argv):
+    parser = argparse.ArgumentParser()
+
+    # General
+    parser.add_argument('--experiment_name', type=str, default='default_run', help='Name of current experiment')
+    parser.add_argument('--dataset', type=str, default='MNIST', help="Dataset to be used in training procedure")
+    parser.add_argument('--seed', type=int, required=False,
+                        help="Random seed. If defined all random operations will be reproducible")
+    parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
+                        help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
+    parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--log_wandb', default=False, action='store_true', help="Log training process on wandb")
+
+    # Data
+    parser.add_argument('--skip_normalization', default=False, action='store_true',
+                        help='Loads dataset without normalization')
+    parser.add_argument('--train_aug', default=False, action='store_true',
+                        help="Allow data augmentation during training")
+    parser.add_argument('--regularization', type=str, default='none', choices=['none', 'cutmix'],
+                        help='Regularization types')
+    parser.add_argument('--global_benchmark', default=False, action='store_true',
+                        help="Train a global classifier as a benchmark model")
+
+    # Model
+    parser.add_argument('--fe_type', type=str, default="mlp400", help='mlp400|conv|resnet18|preact-resnet32')
+    parser.add_argument('--depth', type=int, default=32, help='Depth of a PreAct-Resnet model')
+    parser.add_argument('--gen_latent_size', type=int, default=10, help="Latent size in VAE")
+    parser.add_argument('--gen_d', type=int, default=8, help="Size of binary autoencoder")
+    parser.add_argument('--activetype', default='ReLU',
+                        choices=['ReLU6', 'LeakyReLU', 'PReLU', 'ReLU', 'ELU', 'Softplus', 'SELU', 'None'],
+                        help='Activation types')
+    parser.add_argument('--pooltype', type=str, default='MaxPool2d',
+                        choices=['MaxPool2d', 'AvgPool2d', 'adaptive_max_pool2d', 'adaptive_avg_pool2d'],
+                        help='Pooling types')
+    parser.add_argument('--normtype', type=str, default='BatchNorm', choices=['BatchNorm', 'InstanceNorm'],
+                        help='Batch normalization types')
+    parser.add_argument('--preact', action="store_true", default=False,
+                        help='Places norms and activations before linear/conv layer. Set to False by default')
+    parser.add_argument('--bn', action="store_false", default=True, help='Apply Batchnorm. Set to True by default')
+    parser.add_argument('--affine_bn', action="store_false", default=True,
+                        help='Apply affine transform in BN. Set to True by default')
+    parser.add_argument('--bn_eps', type=float, default=1e-6, help='Affine transform for batch norm')
+    parser.add_argument('--compression', type=float, default=0.5, help='DenseNet BC hyperparam')
+    parser.add_argument('--in_channels', default=3, type=int, help="Number of data channels")
+    parser.add_argument('--num_classes', default=0, type=int, help="Number of classes")
+
+    # Training
+    parser.add_argument('--generator_type', type=str, default="vae", help='vae|gan')
+    parser.add_argument('--optimiser', default='Adam', choices=['Adam', 'SGD'], help='Optimiser types')
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--load_feature_extractor', default=False, action='store_true', help="Load Feature Extractor")
+    parser.add_argument('--load_classifier', default=False, action='store_true', help="Load Classifier")
+    parser.add_argument('--feature_extractor_epochs', default=30, type=int, help="Feature Extractor training epochs")
+    parser.add_argument('--classifier_epochs', default=5, type=int, help="Classifier training epochs")
+    parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',
+                        help="Validate feature extractors cosine similarity")
+    parser.add_argument('--calc_noise', default=False, action='store_true',
+                        help="Calculate optimised GAN noise")
+    parser.add_argument('--reset_model', default=False, action='store_true', help="Reset model before every task")
+    parser.add_argument('--final_task_only', default=False, action='store_true', help="Reset model before every task")
+    parser.add_argument('--train_on_available_data', default=True, action='store_true',
+                        help="Train on available real samples")
+
+    return parser.parse_args(argv)
