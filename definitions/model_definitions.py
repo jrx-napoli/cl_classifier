@@ -1,11 +1,14 @@
 from definitions.gdumb_resnet import ResNet
+from definitions.continual_benchmark_resnet import ResNet34
 from definitions.mlp import MLP, Classifier
+import torchvision
 
 
 def create_feature_extractor(device, latent_size, in_size, args):
     if args.fe_type in ["resnet18", "resnet32"]:
-        return ResNet(opt=args).to(device)
-        # return torchvision.models.resnet18(pretrained=False, num_classes=latent_size).to(device)
+        # return torchvision.models.resnet18(weights=None, num_classes=latent_size).to(device)
+        # return ResNet(opt=args).to(device)
+        return ResNet34(out_dim=latent_size).to(device)
     else:
         return MLP(model_type=args.fe_type,
                    latent_size=latent_size,

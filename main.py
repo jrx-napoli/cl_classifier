@@ -72,10 +72,7 @@ def run(args):
         if args.final_task_only and task_id != (n_tasks - 1):
             continue
 
-        if args.train_on_available_data:
-            train_loader = train_loaders[task_id]
-        else:
-            train_loader = None
+        train_loader = train_loaders[task_id]
 
         print("\n######### Task number {} #########".format(task_id))
         feature_extractor, classifier = training_boot.train_classifier(args=args,
