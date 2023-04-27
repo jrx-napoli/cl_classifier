@@ -7,7 +7,7 @@ from torch import optim
 
 from multiband_vae.vae_experiments import vae_utils
 from multiband_vae.gan_experiments import gan_utils
-from regularization.cutmix import cutmix_data
+from regularization.cutmix import cutmix_images, cutmix_repr
 import wandb
 
 torch.autograd.set_detect_anomaly(True)
@@ -98,12 +98,13 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     batch_size = args.batch_size
     n_iterations = len(train_loader)
     # n_prev_examples = int(batch_size * min(task_id, 10))
-    n_prev_examples = 950 * 2
+    n_prev_examples = 95 * 20
     n_tasks = task_id
 
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
-
+    if args.log_wandb:
+        wandb.run.summary["Generations per iteration"] = n_prev_examples
 
     criterion = get_fe_criterion(args=args)
     optimizer = get_optimiser(args=args, model=feature_extractor)
@@ -150,13 +151,13 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
 
                 optimizer.zero_grad()
 
-                do_cutmix = args.regularization == "cutmix" and np.random.rand(1) < args.cutmix_prob
-                if do_cutmix: inputs, labels_a, labels_b, lam = cutmix_data(x=generations[start_point:end_point],
-                                                                            y=translator_emb[start_point:end_point],
-                                                                            alpha=args.cutmix_alpha)
+                do_cutmix = args.cutmix and np.random.rand(1) < args.cutmix_prob
+                if do_cutmix:
+                    inputs, labels_a, labels_b, lam = cutmix_images(x=generations[start_point:end_point],
+                                                                    y=translator_emb[start_point:end_point],
+                                                                    alpha=args.cutmix_alpha)
 
                 out = feature_extractor(generations[start_point:end_point])
-
                 loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b) if do_cutmix else criterion(out, translator_emb[start_point:end_point])
                 # loss = criterion(out, translator_emb[start_point:end_point])
 
@@ -175,12 +176,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
             if args.log_wandb:
                 wandb.log({"Feature-extractor loss": np.round(np.mean(losses), 3)})
                 wandb.log({"Mean cosine similarity": np.round(np.mean(cosine_similarities), 3)})
-                wandb.run.summary["Generations per iteration"] = n_prev_examples
             print("Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(epoch,
                                                                                      n_epochs,
                                                                                      np.round(np.mean(losses), 3),
-                                                                                     np.round(np.mean(cosine_similarities),
-                                                                                              3),
+                                                                                     np.round(
+                                                                                         np.mean(cosine_similarities),
+                                                                                         3),
                                                                                      np.round(time.time() - start), 3))
 
     return feature_extractor, noise_cache
@@ -197,7 +198,8 @@ def train_classifier(args, classifier, decoder, task_id, device,
     n_epochs = args.classifier_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    n_prev_examples = int(batch_size * min(task_id, 10))
+    # n_prev_examples = int(batch_size * min(task_id, 10))
+    n_prev_examples = 95 * 20
     n_tasks = task_id
 
     print(f'Iterations /epoch: {n_iterations}')
@@ -245,14 +247,21 @@ def train_classifier(args, classifier, decoder, task_id, device,
 
                 optimizer.zero_grad()
 
+                do_cutmix = args.cutmix and np.random.rand(1) < args.cutmix_prob
+                if do_cutmix:
+                    inputs, labels_a, labels_b, lam = cutmix_repr(x=translator_emb[start_point:end_point],
+                                                                  y=classes[start_point:end_point],
+                                                                  alpha=args.cutmix_alpha)
+
                 out = classifier(translator_emb[start_point:end_point])
-                loss = criterion(out, classes[start_point:end_point].to(classifier.device))
+                loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b) if do_cutmix else criterion(out, classes[start_point:end_point])
+                # loss = criterion(out, classes[start_point:end_point].to(classifier.device))
 
                 loss.backward()
                 optimizer.step()
 
                 with torch.no_grad():
-                    acc = get_classifier_accuracy(out, classes[start_point:end_point].to(classifier.device))
+                    acc = get_correct_sum(out, classes[start_point:end_point].to(classifier.device))
                     accuracy += acc.item()
                     total += len(classes[start_point:end_point])
                     losses.append(loss.item())
@@ -260,6 +269,9 @@ def train_classifier(args, classifier, decoder, task_id, device,
         scheduler.step()
 
         if epoch % 1 == 0:
+            if args.log_wandb:
+                wandb.log({"Classifier loss": np.round(np.mean(losses), 3)})
+                wandb.log({"Training accuracy": np.round(accuracy * 100 / total, 3)})
             print("Epoch: {}/{}, loss: {}, Acc: {} %, took: {} s".format(epoch, n_epochs,
                                                                          np.round(np.mean(losses), 3),
                                                                          np.round(accuracy * 100 / total, 3),
@@ -268,7 +280,7 @@ def train_classifier(args, classifier, decoder, task_id, device,
     return classifier
 
 
-def get_classifier_accuracy(y_pred, y_test):
+def get_correct_sum(y_pred, y_test):
     _, y_pred_tag = torch.max(y_pred, 1)
     correct_results_sum = (y_pred_tag == y_test).sum().float()
     return correct_results_sum

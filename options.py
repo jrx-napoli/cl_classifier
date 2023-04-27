@@ -19,8 +19,7 @@ def get_args(argv):
                         help='Loads dataset without normalization')
     parser.add_argument('--train_aug', default=False, action='store_true',
                         help="Allow data augmentation during training")
-    parser.add_argument('--regularization', type=str, default='none', choices=['none', 'cutmix'],
-                        help='Regularization types')
+    parser.add_argument('--cutmix', default=False, action='store_true', help='Use cutmix regularization')
     parser.add_argument('--cutmix_alpha', type=float, default=1.0, help='Cutmix alpha parameter')
     parser.add_argument('--cutmix_prob', type=float, default=0.5, help='Cutmix probability')
     parser.add_argument('--global_benchmark', default=False, action='store_true',
@@ -58,9 +57,9 @@ def get_args(argv):
     parser.add_argument('--mse_reduction', default=False, action='store_true', help="Use MSE loss reduction type sum")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--load_feature_extractor', default=False, action='store_true', help="Load Feature Extractor")
-    parser.add_argument('--load_classifier', default=False, action='store_true', help="Load Classifier")
+    parser.add_argument('--load_classifier', default=True, action='store_true', help="Load Classifier")
     parser.add_argument('--feature_extractor_epochs', default=30, type=int, help="Feature Extractor training epochs")
-    parser.add_argument('--classifier_epochs', default=5, type=int, help="Classifier training epochs")
+    parser.add_argument('--classifier_epochs', default=4, type=int, help="Classifier training epochs")
     parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',
                         help="Validate feature extractors cosine similarity")
     parser.add_argument('--calc_noise', default=False, action='store_true',

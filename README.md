@@ -1,4 +1,4 @@
-# cl_classifier
+# Continually trained classifier
 
 #### Split-MNIST
 ```
@@ -41,9 +41,14 @@ python main.py --experiment_name CIFAR10_example --dataset CIFAR10 --gpuid 0 --n
 python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 --num_batches 100 --gen_batch_size 64 --gen_d=50 --gen_latent_size 32 --gen_ae_epochs 70 --global_dec_epochs 140 --no_class_remap --gen_n_dim_coding 4 --gen_p_coding 9 --skip_normalization --seed 13 --gen_cond_n_dim_coding 0 --score_on_val --cosine_sim 0.95 --global_lr 0.003 --local_lr 0.001 --binary_latent_size 8 --global_warmup 5 --training_procedure classifier --fe_type resnet18 --generator_type gan --skip_validation --final_task_only
 ```
 
------------------ new commands
+---- updated commands ----
 
 #### CIFAR100
 ```
-python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 --seed 13 --batch_size 256 --fe_type preact-resnet32 --depth 32 --num_classes 100 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_on_available_data --train_aug --log_wandb
+--experiment_name CIFAR100_example --dataset CIFAR100 --num_classes 100 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet32 --depth 32 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --log_wandb --regularization cutmix
+```
+
+#### CIFAR10
+```
+--experiment_name CIFAR10_example --dataset CIFAR10 --num_classes 10 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet18 --depth 18 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --log_wandb  --regularization cutmix
 ```
