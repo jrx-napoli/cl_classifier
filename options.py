@@ -57,7 +57,7 @@ def get_args(argv):
     parser.add_argument('--mse_reduction', default=False, action='store_true', help="Use MSE loss reduction type sum")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--load_feature_extractor', default=False, action='store_true', help="Load Feature Extractor")
-    parser.add_argument('--load_classifier', default=True, action='store_true', help="Load Classifier")
+    parser.add_argument('--load_classifier', default=False, action='store_true', help="Load Classifier")
     parser.add_argument('--feature_extractor_epochs', default=30, type=int, help="Feature Extractor training epochs")
     parser.add_argument('--classifier_epochs', default=4, type=int, help="Classifier training epochs")
     parser.add_argument('--calc_cosine_similarity', default=False, action='store_true',

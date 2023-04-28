@@ -156,10 +156,11 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
                     inputs, labels_a, labels_b, lam = cutmix_images(x=generations[start_point:end_point],
                                                                     y=translator_emb[start_point:end_point],
                                                                     alpha=args.cutmix_alpha)
-
-                out = feature_extractor(generations[start_point:end_point])
-                loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b) if do_cutmix else criterion(out, translator_emb[start_point:end_point])
-                # loss = criterion(out, translator_emb[start_point:end_point])
+                    out = feature_extractor(inputs)
+                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b)
+                else:
+                    out = feature_extractor(generations[start_point:end_point])
+                    criterion(out, translator_emb[start_point:end_point])
 
                 loss.backward()
                 optimizer.step()
@@ -252,10 +253,11 @@ def train_classifier(args, classifier, decoder, task_id, device,
                     inputs, labels_a, labels_b, lam = cutmix_repr(x=translator_emb[start_point:end_point],
                                                                   y=classes[start_point:end_point],
                                                                   alpha=args.cutmix_alpha)
-
-                out = classifier(translator_emb[start_point:end_point])
-                loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b) if do_cutmix else criterion(out, classes[start_point:end_point])
-                # loss = criterion(out, classes[start_point:end_point].to(classifier.device))
+                    out = classifier(inputs)
+                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b)
+                else:
+                    out = classifier(translator_emb[start_point:end_point])
+                    loss = criterion(out, classes[start_point:end_point].to(classifier.device))
 
                 loss.backward()
                 optimizer.step()

@@ -99,7 +99,7 @@ def run(args):
                                                  data_loader=val_dataset_loader)
             print(f'Task {i}: {acc} %')
             accuracy[i].append(acc)
-            if args.log_wandb:
+            if args.log_wandb and not args.final_task_only:
                 wandb.log({f"Accuracy on task {i}": acc})
 
         # Global accuracy graph

@@ -45,10 +45,10 @@ python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --gpuid 0 -
 
 #### CIFAR100
 ```
---experiment_name CIFAR100_example --dataset CIFAR100 --num_classes 100 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet32 --depth 32 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --log_wandb --regularization cutmix
+--experiment_name CIFAR100_example --dataset CIFAR100 --num_classes 100 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet32 --depth 32 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --regularization cutmix --log_wandb
 ```
 
 #### CIFAR10
 ```
---experiment_name CIFAR10_example --dataset CIFAR10 --num_classes 10 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet18 --depth 18 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --log_wandb  --regularization cutmix
+--experiment_name CIFAR10_example --dataset CIFAR10 --num_classes 10 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet18 --depth 18 --feature_extractor_epochs 30 --generator_type gan --final_task_only --train_aug --regularization cutmix --log_wandb
 ```

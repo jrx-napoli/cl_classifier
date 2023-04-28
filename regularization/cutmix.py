@@ -74,9 +74,7 @@ def rand_vec(size, lam):
     cut_rat = 1. - lam
     cut_w = np.int(W * cut_rat)
 
-    # uniform
     cx = np.random.randint(W)
-
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
     bbx2 = np.clip(cx + cut_w // 2, 0, W)
 
