@@ -166,11 +166,4 @@ def optimize_noise(
                 f"[Noise optimization] [Epoch {i}/{n_iterations}] [Loss: {loss.item():.3f}]"
             )
 
-        if log:
-            wandb.log(
-                {
-                    f"loss_optimization_task_{task_id}": np.round(loss.item(), 3),
-                }
-            )
-
     return noise, translator_emb

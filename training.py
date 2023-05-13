@@ -43,7 +43,7 @@ def calculate_gan_noise(args, generator, train_loader, noise_cache, task_id, dev
     n_iterations = 500
 
     for iteration, batch in enumerate(train_loader):
-        print(f"Batch {iteration}/{n_iterations}")
+        print(f"Batch {iteration}/{len(train_loader)}")
 
         local_imgs, local_classes = batch
         local_imgs = local_imgs.to(device)
@@ -79,7 +79,7 @@ def generate_images(args, batch_size, generator, n_prev_examples, n_tasks):
     elif args.generator_type == "gan":
         # TODO bugfix: number of generations is rounded down
         generations, _, classes, translator_emb = gan_utils.generate_previous_data(
-            n_prev_tasks=(5 * n_tasks),  # TODO adjust for specific dataset - n_classes for each tasks?
+            n_prev_tasks=(2 * n_tasks),  # TODO adjust for specific dataset - n_classes for each tasks?
             n_prev_examples=n_prev_examples,
             curr_global_generator=generator)
 
@@ -97,8 +97,8 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     n_epochs = args.feature_extractor_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    # n_prev_examples = int(batch_size * min(task_id, 10))
-    n_prev_examples = 95 * 20
+    n_prev_examples = int(batch_size * min(task_id, 2))
+    # n_prev_examples = 95 * 20
     n_tasks = task_id
 
     print(f'Iterations /epoch: {n_iterations}')
@@ -160,7 +160,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
                     loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b)
                 else:
                     out = feature_extractor(generations[start_point:end_point])
-                    criterion(out, translator_emb[start_point:end_point])
+                    loss = criterion(out, translator_emb[start_point:end_point])
 
                 loss.backward()
                 optimizer.step()
@@ -199,8 +199,8 @@ def train_classifier(args, classifier, decoder, task_id, device,
     n_epochs = args.classifier_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    # n_prev_examples = int(batch_size * min(task_id, 10))
-    n_prev_examples = 95 * 20
+    n_prev_examples = int(batch_size * min(task_id, 2))
+    # n_prev_examples = 95 * 20
     n_tasks = task_id
 
     print(f'Iterations /epoch: {n_iterations}')

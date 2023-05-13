@@ -19,7 +19,7 @@ def create_CI_eval_dataloaders(n_tasks, val_dataset_splits, args):
         eval_data = data.ConcatDataset(datasets)
         eval_loader = data.DataLoader(dataset=eval_data, batch_size=args.batch_size, shuffle=True)
         eval_loaders.append(eval_loader)
-    
+
     return eval_loaders
 
 
@@ -29,13 +29,12 @@ def split_data(args, dataset, drop_last):
     """
     n_tasks = None
     mask = None
+    loaders = []
+    datasets = []
 
     if args.dataset.lower() == "cifar100":
-        # split cifar into 20 disjoint tasks, each containing 5 new classes
+        # 20 disjoint tasks, 5 classes each
         n_tasks = 20
-        loaders = []
-        datasets = []
-
         for task_id in range(n_tasks):
 
             idx = torch.zeros(len(dataset), dtype=torch.int)
@@ -46,14 +45,78 @@ def split_data(args, dataset, drop_last):
                 mask = idx.nonzero().reshape(-1)
 
             train_subset = Subset(dataset, mask)
-            # NOTE -> no shuffeling, because of gan noise cache
+            # NOTE -> no shuffling, because of gan noise cache
             datasets.append(train_subset)
-            loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False, drop_last=drop_last)) # TODO -> fix last batch issue
-        
+            loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
+                                           drop_last=drop_last))  # TODO -> fix last batch issue
+
+        return loaders, datasets, n_tasks
+
+    elif args.dataset.lower() == "cifar10":
+        # 5 disjoint tasks, 2 classes each
+        n_tasks = 5
+        for task_id in range(n_tasks):
+
+            idx = torch.zeros(len(dataset), dtype=torch.int)
+
+            for class_id in range(2):
+                class_idx = (torch.tensor(dataset.labels)).clone().detach() == ((task_id * 2) + class_id)
+                idx = idx | class_idx
+                mask = idx.nonzero().reshape(-1)
+
+            train_subset = Subset(dataset, mask)
+            # NOTE -> no shuffling, because of gan noise cache
+            datasets.append(train_subset)
+            loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
+                                           drop_last=drop_last))
+
         return loaders, datasets, n_tasks
 
     else:
         raise NotImplementedError
+
+
+def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
+    # normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
+    normalize = transforms.Normalize(mean=[0.5], std=[0.5])  # same normalization as for Multiband Gan training
+
+    if skip_normalization:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
+    else:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_transform = val_transform
+
+    if train_aug:
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_dataset = torchvision.datasets.CIFAR10(
+        root=dataroot,
+        train=True,
+        download=True,
+        transform=train_transform
+    )
+
+    val_dataset = torchvision.datasets.CIFAR10(
+        root=dataroot,
+        train=False,
+        download=True,
+        transform=val_transform
+    )
+    train_dataset = DataWrapper(train_dataset)
+    val_dataset = DataWrapper(val_dataset)
+
+    return train_dataset, val_dataset
 
 
 def CIFAR100(dataroot, skip_normalization=False, train_aug=True):
@@ -71,14 +134,14 @@ def CIFAR100(dataroot, skip_normalization=False, train_aug=True):
         ])
 
     train_transform = val_transform
-    
+
     if train_aug:
         train_transform = transforms.Compose([
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ])
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
 
     train_dataset = torchvision.datasets.CIFAR100(
         root=dataroot,
@@ -103,6 +166,7 @@ class DataWrapper(Dataset):
     """
     Dataset wrapper with access to class labels
     """
+
     def __init__(self, dataset) -> None:
         super().__init__()
         self.dataset = dataset
@@ -110,6 +174,6 @@ class DataWrapper(Dataset):
 
     def __getitem__(self, index):
         return self.dataset[index]
-    
+
     def __len__(self):
         return len(self.labels)
