@@ -6,9 +6,9 @@ import torchvision
 
 def create_feature_extractor(device, latent_size, in_size, args):
     if args.fe_type == "resnet18":
-        # return torchvision.models.resnet18(weights=None, num_classes=latent_size).to(device)
+        return torchvision.models.resnet18(weights=None, num_classes=latent_size).to(device)
         # return ResNet(opt=args).to(device)
-        return ResNet18(out_dim=latent_size).to(device)
+        # return ResNet18(out_dim=latent_size).to(device)
     elif args.fe_type == "resnet34":
         return ResNet34(out_dim=latent_size).to(device)
     else:

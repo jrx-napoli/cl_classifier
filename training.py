@@ -87,7 +87,7 @@ def generate_images(args, batch_size, generator, n_prev_examples, n_tasks):
 
 
 def train_feature_extractor(args, feature_extractor, decoder, task_id, device, train_loader,
-                            noise_cache=None):
+                            encoder=None, translator=None, noise_cache=None):
     if args.log_wandb:
         wandb.watch(feature_extractor)
     feature_extractor.train()
@@ -97,7 +97,7 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     n_epochs = args.feature_extractor_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    n_prev_examples = int(batch_size * min(task_id, 2))
+    n_prev_examples = int(batch_size * min(task_id, 3))
     # n_prev_examples = 95 * 20
     n_tasks = task_id
 
@@ -125,14 +125,21 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
             # local data
             local_imgs, _ = batch
             local_imgs = local_imgs.to(device)
-            emb_start_point = iteration * batch_size
-            emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
-            local_translator_emb = noise_cache[emb_start_point:emb_end_point]
+
+            if args.generator_type == "gan":
+                emb_start_point = iteration * batch_size
+                emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
+                local_translator_emb = noise_cache[emb_start_point:emb_end_point]
+            else:
+                local_translator_emb = encoder(translator(local_imgs))
 
             # rehearsal data
             with torch.no_grad():
-                generations, translator_emb, _ = generate_images(args=args, batch_size=batch_size, generator=decoder,
-                                                                 n_prev_examples=n_prev_examples, n_tasks=n_tasks)
+                generations, translator_emb, _ = generate_images(args=args,
+                                                                 batch_size=batch_size,
+                                                                 generator=decoder,
+                                                                 n_prev_examples=n_prev_examples,
+                                                                 n_tasks=n_tasks)
                 generations = generations.to(device)
 
             # concat local and generated data
@@ -199,7 +206,7 @@ def train_classifier(args, classifier, decoder, task_id, device,
     n_epochs = args.classifier_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    n_prev_examples = int(batch_size * min(task_id, 2))
+    n_prev_examples = int(batch_size * min(task_id, 3))
     # n_prev_examples = 95 * 20
     n_tasks = task_id
 

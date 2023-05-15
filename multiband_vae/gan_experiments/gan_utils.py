@@ -139,7 +139,7 @@ def generate_previous_data(
 
 
 def optimize_noise(
-    images, generator, n_iterations, task_id, lr, log=False, labels=None
+    images, generator, n_iterations, task_id, lr, labels=None
 ):
     generator.eval()
 

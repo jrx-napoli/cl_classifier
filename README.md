@@ -33,13 +33,18 @@ python main.py --experiment_name Omniglot_example --dataset Omniglot --gpuid 0 -
 
 ---- updated commands ----
 
-#### CIFAR10
+#### CI5-MNIST
 ```
-python main.py --experiment_name CIFAR10_example --dataset CIFAR10 --num_classes 10 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 64 --fe_type resnet18 --feature_extractor_epochs 30 --generator_type gan --final_task_only --calc_noise --train_aug --cutmix --log_wandb
+python main.py --experiment_name MNIST_example --dataset MNIST --num_classes 10 --gpuid 0  --seed 13 --optimizer Adam --mse_reduction  --batch_size 64 --fe_type mlp400 --feature_extractor_epochs 30 --generator_type gan --final_task_only --calc_noise --log_wandb
 ```
 
-#### CIFAR100
+#### CI5-CIFAR10
 ```
-python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --num_classes 100 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet34 --feature_extractor_epochs 30 --generator_type gan --final_task_only --calc_noise --train_aug --cutmix --log_wandb
+python main.py --experiment_name CIFAR10_example --dataset CIFAR10 --num_classes 10 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 64 --fe_type resnet18 --feature_extractor_epochs 30 --generator_type gan --calc_noise --train_aug --cutmix --log_wandb
+```
+
+#### CI20-CIFAR100
+```
+python main.py --experiment_name CIFAR100_example --dataset CIFAR100 --num_classes 100 --gpuid 0 --seed 13 --optimizer Adam --mse_reduction --batch_size 256 --fe_type resnet34 --feature_extractor_epochs 30 --generator_type gan --calc_noise --train_aug --cutmix --log_wandb
 ```
 

@@ -52,7 +52,7 @@ def split_data(args, dataset, drop_last):
 
         return loaders, datasets, n_tasks
 
-    elif args.dataset.lower() == "cifar10":
+    elif args.dataset.lower() in ["mnist", "fashionmnist", "cifar10"]:
         # 5 disjoint tasks, 2 classes each
         n_tasks = 5
         for task_id in range(n_tasks):
@@ -68,12 +68,92 @@ def split_data(args, dataset, drop_last):
             # NOTE -> no shuffling, because of gan noise cache
             datasets.append(train_subset)
             loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
-                                           drop_last=drop_last))
-
+                                           drop_last=False))
         return loaders, datasets, n_tasks
 
     else:
         raise NotImplementedError
+
+
+def MNIST(dataroot, skip_normalization=False, train_aug=True):
+    normalize = transforms.Normalize(mean=0.1307, std=0.3081)
+    # normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for GAN 28x28
+
+    if skip_normalization:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
+    else:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_transform = val_transform
+
+    if train_aug:
+        train_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_dataset = torchvision.datasets.MNIST(
+        root=dataroot,
+        train=True,
+        download=True,
+        transform=train_transform
+    )
+
+    val_dataset = torchvision.datasets.MNIST(
+        root=dataroot,
+        train=False,
+        download=True,
+        transform=val_transform
+    )
+    train_dataset = DataWrapper(train_dataset)
+    val_dataset = DataWrapper(val_dataset)
+
+    return train_dataset, val_dataset
+
+
+def FashionMNIST(dataroot, skip_normalization=False, train_aug=True):
+    normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))
+
+    if skip_normalization:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
+    else:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_transform = val_transform
+
+    if train_aug:
+        train_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_dataset = torchvision.datasets.FashionMNIST(
+        root=dataroot,
+        train=True,
+        download=True,
+        transform=train_transform
+    )
+
+    val_dataset = torchvision.datasets.FashionMNIST(
+        root=dataroot,
+        train=False,
+        download=True,
+        transform=val_transform
+    )
+    train_dataset = DataWrapper(train_dataset)
+    val_dataset = DataWrapper(val_dataset)
+
+    return train_dataset, val_dataset
 
 
 def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
