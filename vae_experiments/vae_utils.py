@@ -88,11 +88,12 @@ def generate_images(curr_global_decoder, z, y, return_emb=False, translate_noise
 
 
 def generate_noise_for_previous_data(n_img, latent_size, tasks_dist, device, num_local=0, same_z=False):
+
     if same_z:
         z_max = torch.randn([max(tasks_dist + torch.tensor([num_local])), latent_size]).to(device)
         z = []
         for task_id, n_img in enumerate(tasks_dist):
-            z.append(z_max[:n_img])
+            z.append(z_max[:n_img])            
         z = torch.cat(z)
         return z
     else:
@@ -110,11 +111,11 @@ def generate_previous_data(curr_global_decoder, n_tasks, n_img, num_local=0, tra
             class_table[class_table > 0] = 1
 
         if recent_task_only:
-            curr_class_table = class_table[n_tasks - 1:n_tasks]
+            curr_class_table = class_table[n_tasks-1:n_tasks]
             n_tasks = 1
-        else:
+        else:    
             curr_class_table = class_table[:n_tasks]
-
+        
         tasks_dist = torch.sum(curr_class_table, dim=1) * n_img // torch.sum(curr_class_table)
         tasks_dist[0:n_img - tasks_dist.sum()] += 1  # To fix the division
         assert sum(tasks_dist) == n_img
@@ -128,23 +129,23 @@ def generate_previous_data(curr_global_decoder, n_tasks, n_img, num_local=0, tra
         sampled_classes = torch.cat(sampled_classes)
         assert len(sampled_classes) == n_img
 
-        z_combined = generate_noise_for_previous_data(n_img,
+        z_combined = generate_noise_for_previous_data(n_img, 
                                                       curr_global_decoder.latent_size,
                                                       tasks_dist,
-                                                      device=curr_global_decoder.device,
+                                                      device=curr_global_decoder.device, 
                                                       num_local=num_local,
                                                       same_z=same_z)
 
         if return_z:
-            example, embeddings = generate_images(curr_global_decoder,
-                                                  z_combined,
-                                                  sampled_classes,
-                                                  return_emb=True,
-                                                  translate_noise=translate_noise)
+            example, embeddings = generate_images(curr_global_decoder, 
+                                                    z_combined, 
+                                                    sampled_classes,
+                                                    return_emb=True,
+                                                    translate_noise=translate_noise)
             return example, sampled_classes, z_combined, embeddings
         else:
-            example = generate_images(curr_global_decoder,
-                                      z_combined,
-                                      sampled_classes,
-                                      translate_noise=translate_noise)
+            example = generate_images(curr_global_decoder, 
+                                        z_combined, 
+                                        sampled_classes,
+                                        translate_noise=translate_noise)
             return example, sampled_classes

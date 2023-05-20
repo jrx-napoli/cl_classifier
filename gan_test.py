@@ -7,6 +7,8 @@ generator = torch.load(f"models/gan/MNIST_example/model{task_id}_curr_global_gen
 generator.eval()
 generator.translator.eval()
 
+# print(generator.class_table)
+
 # class_table = curr_global_decoder.class_table
 n_prev_examples = 58
 

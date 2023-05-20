@@ -3,6 +3,7 @@ import copy
 import random
 import wandb
 import torch
+from torchsummary import summary
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -47,7 +48,8 @@ def run(args):
     classifier = model_definitions.create_classifier(device=device,
                                                      latent_size=translated_latent_size,
                                                      n_classes=args.num_classes,
-                                                     hidden_size=translated_latent_size * 2).to(device)
+                                                     hidden_size=translated_latent_size).to(device)
+    # print(summary(feature_extractor, (1, 28, 28)))
     print(f'\nPrepared models:')
     print(feature_extractor)
     print(classifier)

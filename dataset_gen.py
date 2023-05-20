@@ -2,7 +2,7 @@ import torch
 import torch.utils.data as data
 import torchvision
 from torchvision import transforms
-from torch.utils.data import Subset, Dataset
+from torch.utils.data import Subset, Dataset, ConcatDataset
 
 
 def create_CI_eval_dataloaders(n_tasks, val_dataset_splits, args):
@@ -153,6 +153,63 @@ def FashionMNIST(dataroot, skip_normalization=False, train_aug=True):
     train_dataset = DataWrapper(train_dataset)
     val_dataset = DataWrapper(val_dataset)
 
+    return train_dataset, val_dataset
+
+
+def DoubleMNIST(dataroot, skip_normalization=False, train_aug=False):
+    normalize = transforms.Normalize(mean=(0.1307,), std=(0.3081,))
+
+    if skip_normalization:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
+    else:
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_transform = val_transform
+    if train_aug:
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_dataset_fashion = torchvision.datasets.FashionMNIST(
+        root=dataroot,
+        train=True,
+        download=True,
+        transform=train_transform
+    )
+
+    train_dataset_mnist = torchvision.datasets.MNIST(
+        root=dataroot,
+        train=True,
+        download=True,
+        transform=train_transform
+    )
+
+    val_dataset_fashion = torchvision.datasets.FashionMNIST(
+        dataroot,
+        train=False,
+        transform=val_transform
+    )
+
+    val_dataset_mnist = torchvision.datasets.MNIST(
+        dataroot,
+        train=False,
+        transform=val_transform
+    )
+    train_dataset_mnist.targets = train_dataset_mnist.targets + 10
+    val_dataset_mnist.targets = val_dataset_mnist.targets + 10
+    train_dataset = ConcatDataset([train_dataset_fashion, train_dataset_mnist])
+    train_dataset.root = train_dataset_mnist.root
+    val_dataset = ConcatDataset([val_dataset_fashion, val_dataset_mnist])
+    val_dataset.root = val_dataset_mnist.root
+    # val_dataset = DataWrapper(val_dataset)
+    # train_dataset = DataWrapper(train_dataset)
     return train_dataset, val_dataset
 
 
