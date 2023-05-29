@@ -143,11 +143,11 @@ def generate_previous_data(
                 random_noise, curr_global_generator.shared(task_ids.long())
             )
         else:
-            generations, translator_emb = curr_global_generator(
-                random_noise, task_ids, return_emb=True
+            generations = curr_global_generator(
+                random_noise, task_ids
             )
 
-        return generations, task_ids, random_noise, translator_emb
+        return generations, random_noise, task_ids
 
 
 def optimize_noise(
