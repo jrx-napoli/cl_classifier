@@ -65,6 +65,7 @@ def get_args(argv):
     parser.add_argument('--calc_noise', default=False, action='store_true',
                         help="Calculate optimised GAN noise")
     parser.add_argument('--reset_model', default=False, action='store_true', help="Reset model before every task")
+    parser.add_argument('--biggan_training', default=False, action='store_true', help="Train on BigGAN generator")
     parser.add_argument('--final_task_only', default=False, action='store_true', help="Reset model before every task")
 
     return parser.parse_args(argv)

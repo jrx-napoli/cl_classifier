@@ -23,7 +23,7 @@ def get_fe_criterion(args):
 
 def get_optimiser(args, model):
     if args.optimizer.lower() == "adam":
-        return torch.optim.Adam(list(model.parameters()), lr=0.001)
+        return torch.optim.Adam(list(model.parameters()), lr=0.001, weight_decay=1e-5)
     elif args.optimizer.lower() == "sgd":
         return torch.optim.SGD(list(model.parameters()), lr=args.max_lr, momentum=0.9, weight_decay=args.weight_decay)
     else:
@@ -54,7 +54,8 @@ def calculate_gan_noise(args, generator, train_loader, noise_cache, task_id, dev
                                                            n_iterations=n_iterations,
                                                            task_id=task_id,
                                                            lr=0.01,
-                                                           labels=local_classes)
+                                                           labels=local_classes,
+                                                           biggan_training=args.biggan_training)
         local_translator_emb = local_translator_emb.detach()
 
         if noise_cache is None:
@@ -79,12 +80,13 @@ def generate_images(args, batch_size, generator, n_prev_examples, task_id):
 
     elif args.generator_type == "gan":
         # TODO bugfix: number of generations is rounded down
-        generations, random_noise, classes, translator_emb = gan_utils.generate_previous_data(
+        generations, classes, random_noise, translator_emb = gan_utils.generate_previous_data(
             n_prev_tasks=(2 * task_id),  # TODO adjust for specific dataset - n_classes for each tasks?
             n_prev_examples=n_prev_examples,
-            curr_global_generator=generator)
+            curr_global_generator=generator,
+            biggan_training=args.biggan_training)
 
-    return generations, translator_emb, classes
+    return generations, classes, random_noise, translator_emb
 
 
 def train_feature_extractor(args, feature_extractor, decoder, task_id, device, train_loader,
@@ -117,8 +119,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
 
         # optimize noise and store it for entire training process
         if epoch == 0 and args.calc_noise:
-            noise_cache = calculate_gan_noise(args=args, generator=decoder, train_loader=train_loader,
-                                              noise_cache=noise_cache, task_id=task_id, device=device)
+            noise_cache = calculate_gan_noise(args=args,
+                                              generator=decoder,
+                                              train_loader=train_loader,
+                                              noise_cache=noise_cache,
+                                              task_id=task_id,
+                                              device=device)
 
         for iteration, batch in enumerate(train_loader):
 
@@ -140,14 +146,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
 
             # rehearsal data
             with torch.no_grad():
-                generations, translator_emb, _ = generate_images(args=args,
-                                                                 batch_size=batch_size,
-                                                                 generator=decoder,
-                                                                 n_prev_examples=n_prev_examples,
-                                                                 task_id=task_id)
-                generations = generations.to(device)
-                # generations.detach()
-                # translator_emb.detach()
+                generations, classes, random_noise, translator_emb = generate_images(args=args,
+                                                                                     batch_size=batch_size,
+                                                                                     generator=decoder,
+                                                                                     n_prev_examples=n_prev_examples,
+                                                                                     task_id=task_id)
+                translator_emb = translator_emb.detach()
 
             # concat local and generated data
             images_combined = torch.cat([generations, local_images])
@@ -235,7 +239,6 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
             # local data
             local_images, local_classes = batch
             local_images = local_images.to(device)
-            local_classes = local_classes.to(device)
 
             if args.generator_type == "vae":
                 local_translator_emb = local_vae(x=local_images,
@@ -245,17 +248,19 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
                                                  encode_to_noise=True)
                 local_translator_emb = local_translator_emb.detach()
             else:
+                local_classes = local_classes.to(device)
                 emb_start_point = iteration * batch_size
                 emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
                 local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
             with torch.no_grad():
-                _, translator_emb, classes = generate_images(args=args, batch_size=batch_size, generator=decoder,
-                                                             n_prev_examples=n_prev_examples, task_id=task_id)
-            classes = classes.long()
-            # classes.detach()
-            # translator_emb.detach()
+                generations, classes, random_noise, translator_emb = generate_images(args=args, batch_size=batch_size,
+                                                                                     generator=decoder,
+                                                                                     n_prev_examples=n_prev_examples,
+                                                                                     task_id=task_id + 1)
+                translator_emb = translator_emb.detach()
+                classes = classes.long()
 
             # concat local and generated data
             emb_combined = torch.cat([translator_emb, local_translator_emb])

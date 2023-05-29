@@ -68,7 +68,7 @@ def split_data(args, dataset, drop_last):
             # NOTE -> no shuffling, because of gan noise cache
             datasets.append(train_subset)
             loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
-                                           drop_last=False))
+                                           drop_last=False))  # TODO: is this the reason?
         return loaders, datasets, n_tasks
 
     else:

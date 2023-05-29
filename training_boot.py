@@ -6,7 +6,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
     local_vae = None
     noise_cache = None
 
-    # Load the generator
+    # Load the generative models
     if args.generator_type == "vae":
         local_vae_path = f'models/vae/{args.experiment_name}/model{task_id}_local_vae'
         local_vae = torch.load(local_vae_path).to(device)
