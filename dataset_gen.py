@@ -1,13 +1,13 @@
 import torch
 import torch.utils.data as data
 import torchvision
+from torch.utils.data import Subset, ConcatDataset
 from torchvision import transforms
-from torch.utils.data import Subset, Dataset, ConcatDataset
 
 
-def create_CI_eval_dataloaders(n_tasks, val_dataset_splits, args):
+def get_CI_eval_dataloaders(val_dataset_splits, n_tasks, batch_size):
     """
-    Evaluation CI dataset contains data from all previous tasks
+    Evaluation class incremental dataset contains data from all previous tasks
     """
     eval_loaders = []
     for task_id in range(n_tasks):
@@ -17,16 +17,36 @@ def create_CI_eval_dataloaders(n_tasks, val_dataset_splits, args):
             datasets.append(val_dataset_splits[i])
 
         eval_data = data.ConcatDataset(datasets)
-        eval_loader = data.DataLoader(dataset=eval_data, batch_size=args.batch_size, shuffle=True)
+        eval_loader = data.DataLoader(dataset=eval_data, batch_size=batch_size, shuffle=True)
         eval_loaders.append(eval_loader)
 
     return eval_loaders
 
 
-def split_data(args, dataset, drop_last):
-    """
-    Dataset-dependant data split
-    """
+def get_CI_datasplit(dataset, n_tasks, n_classes_per_task, batch_size, drop_last):
+    mask = None
+    loaders = []
+    datasets = []
+
+    for task_id in range(n_tasks):
+        idx = torch.zeros(len(dataset), dtype=torch.int)
+
+        for class_id in range(n_classes_per_task):
+            class_idx = (torch.tensor(dataset.targets)).clone().detach() == ((task_id * n_classes_per_task) + class_id)
+            idx = idx | class_idx
+            mask = idx.nonzero().reshape(-1)
+
+        train_subset = Subset(dataset, mask)
+        datasets.append(train_subset)
+        loaders.append(data.DataLoader(dataset=train_subset,
+                                       batch_size=batch_size,
+                                       shuffle=False,  # NOTE -> no shuffling, because of gan noise cache
+                                       drop_last=drop_last))  # TODO -> fix last batch issue
+
+    return loaders, datasets
+
+
+"""def split_data(args, dataset, drop_last):
     n_tasks = None
     mask = None
     loaders = []
@@ -68,16 +88,35 @@ def split_data(args, dataset, drop_last):
             # NOTE -> no shuffling, because of gan noise cache
             datasets.append(train_subset)
             loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
-                                           drop_last=False))  # TODO: is this the reason?
+                                           drop_last=False))
+        return loaders, datasets, n_tasks
+
+    elif args.dataset.lower() in ["doublemnist"]:
+        # 5 disjoint tasks, 2 classes each
+        n_tasks = 10
+        for task_id in range(n_tasks):
+
+            idx = torch.zeros(len(dataset), dtype=torch.int)
+
+            for class_id in range(2):
+                class_idx = (torch.tensor(dataset.labels)).clone().detach() == ((task_id * 2) + class_id)
+                idx = idx | class_idx
+                mask = idx.nonzero().reshape(-1)
+
+            train_subset = Subset(dataset, mask)
+            # NOTE -> no shuffling, because of gan noise cache
+            datasets.append(train_subset)
+            loaders.append(data.DataLoader(dataset=train_subset, batch_size=args.batch_size, shuffle=False,
+                                           drop_last=False))
         return loaders, datasets, n_tasks
 
     else:
-        raise NotImplementedError
+        raise NotImplementedError"""
 
 
 def MNIST(dataroot, skip_normalization=False, train_aug=True):
-    normalize = transforms.Normalize(mean=0.1307, std=0.3081)
-    # normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for GAN 28x28
+    # normalize = transforms.Normalize(mean=0.1307, std=0.3081)
+    normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))  # for GAN 28x28
 
     if skip_normalization:
         val_transform = transforms.Compose([
@@ -110,8 +149,6 @@ def MNIST(dataroot, skip_normalization=False, train_aug=True):
         download=True,
         transform=val_transform
     )
-    train_dataset = DataWrapper(train_dataset)
-    val_dataset = DataWrapper(val_dataset)
 
     return train_dataset, val_dataset
 
@@ -133,6 +170,7 @@ def FashionMNIST(dataroot, skip_normalization=False, train_aug=True):
 
     if train_aug:
         train_transform = transforms.Compose([
+            # transforms.RandomCrop(32, padding=4),
             transforms.ToTensor(),
             normalize,
         ])
@@ -150,14 +188,13 @@ def FashionMNIST(dataroot, skip_normalization=False, train_aug=True):
         download=True,
         transform=val_transform
     )
-    train_dataset = DataWrapper(train_dataset)
-    val_dataset = DataWrapper(val_dataset)
 
     return train_dataset, val_dataset
 
 
 def DoubleMNIST(dataroot, skip_normalization=False, train_aug=False):
-    normalize = transforms.Normalize(mean=(0.1307,), std=(0.3081,))
+    # normalize = transforms.Normalize(mean=(0.1307,), std=(0.3081,))
+    normalize = transforms.Normalize(mean=(0.5,), std=(0.5,))
 
     if skip_normalization:
         val_transform = transforms.Compose([
@@ -208,14 +245,12 @@ def DoubleMNIST(dataroot, skip_normalization=False, train_aug=False):
     train_dataset.root = train_dataset_mnist.root
     val_dataset = ConcatDataset([val_dataset_fashion, val_dataset_mnist])
     val_dataset.root = val_dataset_mnist.root
-    # val_dataset = DataWrapper(val_dataset)
-    # train_dataset = DataWrapper(train_dataset)
     return train_dataset, val_dataset
 
 
 def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
     # normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-    normalize = transforms.Normalize(mean=[0.5], std=[0.5])  # same normalization as for Multiband Gan training
+    normalize = transforms.Normalize(mean=[0.5], std=[0.5])
 
     if skip_normalization:
         val_transform = transforms.Compose([
@@ -250,15 +285,13 @@ def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
         download=True,
         transform=val_transform
     )
-    train_dataset = DataWrapper(train_dataset)
-    val_dataset = DataWrapper(val_dataset)
 
     return train_dataset, val_dataset
 
 
 def CIFAR100(dataroot, skip_normalization=False, train_aug=True):
     # normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-    normalize = transforms.Normalize(mean=[0.5], std=[0.5])  # same normalization as for Multiband Gan training
+    normalize = transforms.Normalize(mean=[0.5], std=[0.5])
 
     if skip_normalization:
         val_transform = transforms.Compose([
@@ -293,24 +326,5 @@ def CIFAR100(dataroot, skip_normalization=False, train_aug=True):
         download=True,
         transform=val_transform
     )
-    train_dataset = DataWrapper(train_dataset)
-    val_dataset = DataWrapper(val_dataset)
 
     return train_dataset, val_dataset
-
-
-class DataWrapper(Dataset):
-    """
-    Dataset wrapper with access to class labels
-    """
-
-    def __init__(self, dataset) -> None:
-        super().__init__()
-        self.dataset = dataset
-        self.labels = dataset.targets
-
-    def __getitem__(self, index):
-        return self.dataset[index]
-
-    def __len__(self):
-        return len(self.labels)

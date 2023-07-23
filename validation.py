@@ -38,7 +38,6 @@ def validate_classifier(feature_extractor, classifier, data_loader):
     feature_extractor.eval()
     classifier.eval()
 
-    # with torch.no_grad():
     for iteration, batch in enumerate(data_loader):
         x = batch[0].to(classifier.device)
         y = batch[1].to(classifier.device)

@@ -1,18 +1,17 @@
-import sys
-import copy
 import random
-import wandb
-import torch
-from torchsummary import summary
-import numpy as np
-import matplotlib.pyplot as plt
+import sys
 
-from definitions import model_definitions
-from options import get_args
-import validation
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
 import dataset_gen
 import training_boot
 import utils
+import validation
+import wandb
+from definitions import model_definitions
+from options import get_args
 
 
 def run(args):
@@ -20,23 +19,35 @@ def run(args):
         wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
     # Get transformed data
-    train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot, args.skip_normalization,
+    train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot,
+                                                                    args.skip_normalization,
                                                                     args.train_aug)
 
     # Prepare dataloaders
     # TODO add 1 class only eval datasets
-    train_loaders, train_datasets, n_tasks = dataset_gen.split_data(args=args, dataset=train_dataset, drop_last=True)
-    val_loaders, val_datasets, _ = dataset_gen.split_data(args=args, dataset=val_dataset, drop_last=False)
-    ci_eval_dataloaders = dataset_gen.create_CI_eval_dataloaders(n_tasks=n_tasks, val_dataset_splits=val_datasets,
-                                                                 args=args)
+    train_loaders, _ = dataset_gen.get_CI_datasplit(dataset=train_dataset,
+                                                    n_tasks=args.n_tasks,
+                                                    n_classes_per_task=args.n_classes_per_task,
+                                                    batch_size=args.batch_size,
+                                                    drop_last=True)
+
+    val_loaders, val_datasets = dataset_gen.get_CI_datasplit(dataset=val_dataset,
+                                                             n_tasks=args.n_tasks,
+                                                             n_classes_per_task=args.n_classes_per_task,
+                                                             batch_size=args.batch_size,
+                                                             drop_last=False)
+
+    ci_eval_dataloaders = dataset_gen.get_CI_eval_dataloaders(val_dataset_splits=val_datasets,
+                                                              n_tasks=args.n_tasks,
+                                                              batch_size=args.batch_size)
 
     # Calculate constants
-    task_names = [i for i in range(n_tasks)]
+    task_names = [i for i in range(args.n_tasks)]
     print(f'\nTask order: {task_names}')
 
     # Accuracy tracking
     global_accuracies = []
-    x, accuracy = utils.prepare_accuracy_data(n_tasks=n_tasks)
+    x, accuracy = utils.prepare_accuracy_data(n_tasks=args.n_tasks)
 
     # Prepare models
     input_size = train_dataset[0][0].size()[1]
@@ -44,39 +55,25 @@ def run(args):
     feature_extractor = model_definitions.create_feature_extractor(device=device,
                                                                    latent_size=translated_latent_size,
                                                                    in_size=input_size,
-                                                                   args=args).to(device)
+                                                                   fe_type=args.fe_type)
     classifier = model_definitions.create_classifier(device=device,
                                                      latent_size=translated_latent_size,
                                                      n_classes=args.num_classes,
-                                                     hidden_size=translated_latent_size).to(device)
-    # print(summary(feature_extractor, (1, 28, 28)))
+                                                     hidden_size=translated_latent_size)
     print(f'\nPrepared models:')
     print(feature_extractor)
     print(classifier)
 
-    # Test classifier's architecture
-    if args.global_benchmark:
-        print(f'\nRunning offline benchamrk:')
-        feature_extractor_copy = copy.deepcopy(feature_extractor)
-        classifier_copy = copy.deepcopy(classifier)
-
-        architecture_validator = validation.OfflineArchitectureValidator()
-        architecture_validator.test_architecture(args=args,
-                                                 feature_extractor=feature_extractor_copy,
-                                                 classifier=classifier_copy,
-                                                 device=device)
-        return
-
     # Experiment loop
-    for task_id in range(n_tasks):
+    for task_id in range(args.n_tasks):
 
         # skip all non final tasks
-        if args.final_task_only and task_id != (n_tasks - 1):
+        if args.final_task_only and task_id != (args.n_tasks - 1):
             continue
 
         train_loader = train_loaders[task_id]
 
-        print("\n######### Task number {} #########".format(task_id))
+        print(f'\n######### Task number {task_id} #########')
         feature_extractor, classifier = training_boot.train_classifier(args=args,
                                                                        feature_extractor=feature_extractor,
                                                                        classifier=classifier,
