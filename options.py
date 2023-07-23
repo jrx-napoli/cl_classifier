@@ -7,6 +7,8 @@ def get_args(argv):
     # General
     parser.add_argument('--experiment_name', type=str, default='default_run', help='Name of current experiment')
     parser.add_argument('--dataset', type=str, default='MNIST', help="Dataset to be used in training procedure")
+    parser.add_argument('--n_tasks', default=5, type=int, help="Number of tasks")
+    parser.add_argument('--n_classes_per_task', default=2, type=int, help="Number of classes per task")
     parser.add_argument('--seed', type=int, required=False,
                         help="Random seed. If defined all random operations will be reproducible")
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
@@ -49,7 +51,7 @@ def get_args(argv):
     parser.add_argument('--num_classes', default=0, type=int, help="Number of classes")
     parser.add_argument('--max_lr', type=float, default=0.05, help='Starting Learning rate')
     parser.add_argument('--min_lr', type=float, default=0.0005, help='Ending Learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-6, help='Weight decay')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
 
     # Training
     parser.add_argument('--generator_type', type=str, default="vae", help='vae|gan')
