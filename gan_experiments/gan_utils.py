@@ -139,8 +139,8 @@ def generate_previous_data(
         )
 
         if biggan_training:
-            generations = curr_global_generator(
-                random_noise, curr_global_generator.shared(task_ids.long())
+            generations, translator_emb = curr_global_generator(
+                random_noise, curr_global_generator.shared(task_ids.long()), return_emb=True
             )
         else:
             generations, translator_emb = curr_global_generator(

@@ -69,7 +69,7 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
 
 
 def generate_images(args, generator, n_prev_examples, task_id):
-    # task_id += 1
+    task_id += 1
     if args.generator_type == "vae":
         generations, classes, random_noise, translator_emb = vae_utils.generate_previous_data(
             generator,
