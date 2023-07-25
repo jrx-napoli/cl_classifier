@@ -1,14 +1,15 @@
 import math
 import time
-import torch
+
 import numpy as np
+import torch
 import torch.nn as nn
 from torch import optim
 
-from multiband_vae.vae_experiments import vae_utils
-from multiband_vae.gan_experiments import gan_utils
-from regularization.cutmix import cutmix_images, cutmix_repr
 import wandb
+from gan_experiments import gan_utils
+from multiband_vae.vae_experiments import vae_utils
+from regularization.cutmix import cutmix_images, cutmix_repr
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -68,7 +69,7 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
 
 
 def generate_images(args, generator, n_prev_examples, task_id):
-    task_id += 1
+    # task_id += 1
     if args.generator_type == "vae":
         generations, classes, random_noise, translator_emb = vae_utils.generate_previous_data(
             generator,
@@ -102,7 +103,6 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     batch_size = args.batch_size
     n_iterations = len(train_loader)
     n_prev_examples = int(batch_size * min(task_id + 1, 3))
-    # n_prev_examples = 95 * 20
 
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
@@ -211,12 +211,11 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
     batch_size = args.batch_size
     n_iterations = len(train_loader)
     n_prev_examples = int(batch_size * min(task_id + 1, 3))
-    # n_prev_examples = 95 * 20
 
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
 
-    optimizer = torch.optim.Adam(list(classifier.parameters()), lr=0.001, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(list(classifier.parameters()), lr=0.001, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     criterion = nn.CrossEntropyLoss()
 
@@ -259,7 +258,6 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
             # emb_combined = translator_emb
             classes_combined = torch.cat([classes, local_classes])
             # classes_combined = classes
-            # print(torch.unique(classes_combined, return_counts=True))
 
             # shuffle
             n_mini_batches = math.ceil(len(emb_combined) / batch_size)

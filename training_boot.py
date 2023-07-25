@@ -12,7 +12,6 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
         local_vae = torch.load(f'models/vae/{args.experiment_name}/model{task_id}_local_vae').to(device)
         generator = torch.load(f'models/vae/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
     elif args.generator_type == "gan":
-        noise_cache = torch.load(f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_noise_cache")
         generator = torch.load(f'models/gan/{args.experiment_name}/model{task_id}_curr_global_generator',
                                map_location="cuda").to(device)
     else:

@@ -143,11 +143,11 @@ def generate_previous_data(
                 random_noise, curr_global_generator.shared(task_ids.long())
             )
         else:
-            generations = curr_global_generator(
-                random_noise, task_ids
+            generations, translator_emb = curr_global_generator(
+                random_noise, task_ids, return_emb=True
             )
 
-        return generations, random_noise, task_ids
+        return generations, task_ids, random_noise, translator_emb
 
 
 def optimize_noise(
@@ -189,13 +189,6 @@ def optimize_noise(
         if i % 100 == 0:
             print(
                 f"[Noise optimization] [Epoch {i}/{n_iterations}] [Loss: {loss.item():.3f}]"
-            )
-
-        if log:
-            wandb.log(
-                {
-                    f"loss_optimization/task_{task_id}": np.round(loss.item(), 3),
-                }
             )
 
     return noise
