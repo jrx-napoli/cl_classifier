@@ -2,9 +2,10 @@ def calculate_translated_latent_size(args):
     if args.generator_type == "vae":
         return args.gen_d * args.gen_latent_size
     elif args.generator_type == "gan":
-        return 100
-    else:
-        raise NotImplementedError
+        if args.biggan_training:
+            return 128
+        else:
+            return 100
 
 
 def prepare_accuracy_data(n_tasks):
