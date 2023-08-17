@@ -128,9 +128,8 @@ def run(args):
 if __name__ == '__main__':
     args = get_args(sys.argv[1:])
 
-    # torch.cuda.set_device(args.gpuid[0])
+    torch.cuda.set_device(args.gpuid[0])
     device = torch.device("cuda")
-    torch.cuda.device = device
 
     if args.seed:
         print("Using manual seed = {}".format(args.seed))
