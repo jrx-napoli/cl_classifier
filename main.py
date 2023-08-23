@@ -41,6 +41,7 @@ def run(args):
                                                               n_tasks=args.n_tasks,
                                                               batch_size=args.batch_size)
 
+
     # Calculate constants
     task_names = [i for i in range(args.n_tasks)]
     print(f'\nTask order: {task_names}')
@@ -60,6 +61,12 @@ def run(args):
                                                      latent_size=translated_latent_size,
                                                      n_classes=args.num_classes,
                                                      hidden_size=translated_latent_size)
+    if args.offline_validation:
+        validator = validation.OfflineArchitectureValidator()
+        validator.test_architecture(args, feature_extractor, classifier, device)
+        return
+
+
     print(f'\nPrepared models:')
     print(feature_extractor)
     print(classifier)

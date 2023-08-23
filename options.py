@@ -15,6 +15,8 @@ def get_args(argv):
                         help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
     parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
     parser.add_argument('--log_wandb', default=False, action='store_true', help="Log training process on wandb")
+    parser.add_argument('--offline_validation', default=False, action='store_true',
+                        help="Validate the architecture in an offline manner")
 
     # Data
     parser.add_argument('--skip_normalization', default=False, action='store_true',

@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -8,6 +10,7 @@ import numpy as np
 import copy
 import time
 import wandb
+from gan_experiments import gan_utils
 
 
 def validate_feature_extractor(feature_extractor, encoder, translator, data_loader):
@@ -146,25 +149,47 @@ class OfflineArchitectureValidator:
         train_ds, val_ds = self.get_dataset(args)
         train_dl, val_dl = self.get_dataloaders(train_ds, val_ds, batch_size=args.batch_size)
 
+        # generate dataset
+        n_prev_examples = 5000
+        generator = torch.load(f'models/gan/{args.experiment_name}/model4_curr_global_generator',
+                               map_location="cuda").to(device)
+
+        generations, classes, _, _ = gan_utils.generate_previous_data(
+            n_prev_tasks=(2 * 5),  # TODO adjust for specific dataset - n_classes for each tasks?
+            n_prev_examples=n_prev_examples,
+            curr_global_generator=generator,
+            biggan_training=args.biggan_training)
+
+        # shuffle
+        n_mini_batches = math.ceil(len(generations) / args.batch_size)
+        shuffle = torch.randperm(len(generations))
+        generations = generations[shuffle]
+        classes = classes[shuffle]
+
         for epoch in range(numb_epoch):
             losses = []
             train_accuracy = 0
             total = 0
             start = time.time()
 
-            for i, batch in enumerate(train_dl):
-                images = batch[0].to(device)
-                labels = batch[1].to(device)
+            # optimize
+            for batch_id in range(n_mini_batches):
+                start_point = batch_id * args.batch_size
+                end_point = min(len(generations), (batch_id + 1) * args.batch_size)
 
-                pred = model(images)
-                loss = criterion(pred, labels)
+                # for i, batch in enumerate(train_dl):
+                #     images = batch[0].to(device)
+                #     labels = batch[1].to(device)
+
+                pred = model(generations[start_point:end_point])
+                loss = criterion(pred, classes[start_point:end_point])
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                train_accuracy += self.count_correct(pred, labels)
-                total += len(images)
+                train_accuracy += self.count_correct(pred, classes[start_point:end_point])
+                total += len(generations)
                 losses.append(loss.item())
 
             print(f'Epoch: {epoch}/{numb_epoch}, loss: {np.round(np.mean(losses), 3)}, ' +
@@ -189,4 +214,4 @@ class OfflineArchitectureValidator:
             scheduler.step()
 
         print(f'Best accuracy: {max_accuracy}')
-        return best_model
+        # return best_model
