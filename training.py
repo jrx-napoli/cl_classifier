@@ -69,7 +69,10 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
 
 
 def generate_images(args, generator, n_prev_examples, task_id):
-    # task_id += 1
+
+    if args.generations_only:
+        task_id += 1
+
     if args.generator_type == "vae":
         generations, classes, random_noise, translator_emb = vae_utils.generate_previous_data(
             generator,
@@ -102,7 +105,11 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     n_epochs = args.feature_extractor_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    n_prev_examples = int(batch_size * min(task_id + 1, 3))
+
+    if args.generations_only:
+        n_prev_examples = int(batch_size * args.max_generations)
+    else:
+        n_prev_examples = int(batch_size * min(task_id + 1, args.max_generations))
 
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
@@ -146,10 +153,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
                 translator_emb = translator_emb.detach()
 
             # concat local and generated data
-            images_combined = torch.cat([generations, local_images])
-            # images_combined = generations
-            emb_combined = torch.cat([translator_emb, local_translator_emb])
-            # emb_combined = translator_emb
+            if args.generations_only:
+                images_combined = generations
+                emb_combined = translator_emb
+            else:
+                images_combined = torch.cat([generations, local_images])
+                emb_combined = torch.cat([translator_emb, local_translator_emb])
 
             # shuffle
             n_mini_batches = math.ceil(len(images_combined) / batch_size)
@@ -210,7 +219,11 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
     n_epochs = args.classifier_epochs
     batch_size = args.batch_size
     n_iterations = len(train_loader)
-    n_prev_examples = int(batch_size * min(task_id + 1, 3))
+
+    if args.generations_only:
+        n_prev_examples = int(batch_size * args.max_generations)
+    else:
+        n_prev_examples = int(batch_size * min(task_id + 1, args.max_generations))
 
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
@@ -254,10 +267,12 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
                 classes = classes.long()
 
             # concat local and generated data
-            emb_combined = torch.cat([translator_emb, local_translator_emb])
-            # emb_combined = translator_emb
-            classes_combined = torch.cat([classes, local_classes])
-            # classes_combined = classes
+            if args.generations_only:
+                emb_combined = translator_emb
+                classes_combined = classes
+            else:
+                emb_combined = torch.cat([translator_emb, local_translator_emb])
+                classes_combined = torch.cat([classes, local_classes])
 
             # shuffle
             n_mini_batches = math.ceil(len(emb_combined) / batch_size)

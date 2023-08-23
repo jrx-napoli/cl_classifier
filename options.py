@@ -22,6 +22,10 @@ def get_args(argv):
     parser.add_argument('--train_aug', default=False, action='store_true',
                         help="Allow data augmentation during training")
     parser.add_argument('--cutmix', default=False, action='store_true', help='Use cutmix regularization')
+    parser.add_argument('--generations_only', default=False, action='store_true',
+                        help='Train only using generated samples')
+    parser.add_argument('--max_generations', type=int, default=3,
+                        help='Maximum number of generated rehearsal sample batches')
     parser.add_argument('--cutmix_alpha', type=float, default=1.0, help='Cutmix alpha parameter')
     parser.add_argument('--cutmix_prob', type=float, default=0.5, help='Cutmix probability')
     parser.add_argument('--global_benchmark', default=False, action='store_true',
