@@ -165,6 +165,7 @@ class OfflineArchitectureValidator:
         shuffle = torch.randperm(len(generations))
         generations = generations[shuffle]
         classes = classes[shuffle]
+        classes = classes.long()
 
         for epoch in range(numb_epoch):
             losses = []
