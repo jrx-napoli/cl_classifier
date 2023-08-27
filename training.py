@@ -157,9 +157,12 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
             if args.generations_only:
                 images_combined = generations
                 emb_combined = translator_emb
-            else:
+            elif task_id > 0:
                 images_combined = torch.cat([generations, local_images])
                 emb_combined = torch.cat([translator_emb, local_translator_emb])
+            else:
+                images_combined = local_images
+                emb_combined = local_translator_emb
 
             # shuffle
             n_mini_batches = math.ceil(len(images_combined) / batch_size)
@@ -272,9 +275,12 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
             if args.generations_only:
                 emb_combined = translator_emb
                 classes_combined = classes
-            else:
+            elif task_id > 0:
                 emb_combined = torch.cat([translator_emb, local_translator_emb])
                 classes_combined = torch.cat([classes, local_classes])
+            else:
+                emb_combined = local_translator_emb
+                classes_combined = local_classes
 
             # shuffle
             n_mini_batches = math.ceil(len(emb_combined) / batch_size)
