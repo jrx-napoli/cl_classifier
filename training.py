@@ -145,12 +145,13 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
                 local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
-            with torch.no_grad():
-                generations, classes, random_noise, translator_emb = generate_images(args=args,
-                                                                                     generator=decoder,
-                                                                                     n_prev_examples=n_prev_examples,
-                                                                                     task_id=task_id)
-                translator_emb = translator_emb.detach()
+            if args.generations_only or task_id > 0:
+                with torch.no_grad():
+                    generations, classes, random_noise, translator_emb = generate_images(args=args,
+                                                                                         generator=decoder,
+                                                                                         n_prev_examples=n_prev_examples,
+                                                                                         task_id=task_id)
+                    translator_emb = translator_emb.detach()
 
             # concat local and generated data
             if args.generations_only:
@@ -258,13 +259,14 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
                 local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
-            with torch.no_grad():
-                generations, classes, random_noise, translator_emb = generate_images(args=args,
-                                                                                     generator=decoder,
-                                                                                     n_prev_examples=n_prev_examples,
-                                                                                     task_id=task_id)
-                translator_emb = translator_emb.detach()
-                classes = classes.long()
+            if args.generations_only or task_id > 0:
+                with torch.no_grad():
+                    generations, classes, random_noise, translator_emb = generate_images(args=args,
+                                                                                         generator=decoder,
+                                                                                         n_prev_examples=n_prev_examples,
+                                                                                         task_id=task_id)
+                    translator_emb = translator_emb.detach()
+                    classes = classes.long()
 
             # concat local and generated data
             if args.generations_only:
