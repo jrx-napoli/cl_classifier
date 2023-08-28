@@ -15,8 +15,24 @@ from options import get_args
 
 
 def run(args):
-    if args.log_wandb:
-        wandb.init(project=f"cl_classifier_{args.experiment_name}")
+
+    torch.cuda.set_device(args.gpuid[0])
+    device = torch.device("cuda")
+
+    if args.seed:
+        print("Using manual seed = {}".format(args.seed))
+
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    else:
+        print("WARNING: Not using manual seed - your experiments will not be reproducible")
+
+    # if args.log_wandb:
+    #     wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
     # Get transformed data
     train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot,
@@ -40,7 +56,6 @@ def run(args):
     ci_eval_dataloaders = dataset_gen.get_CI_eval_dataloaders(val_dataset_splits=val_datasets,
                                                               n_tasks=args.n_tasks,
                                                               batch_size=args.batch_size)
-
 
     # Calculate constants
     task_names = [i for i in range(args.n_tasks)]
@@ -66,7 +81,6 @@ def run(args):
         validator.test_architecture(args, feature_extractor, classifier, device)
         return
 
-
     print(f'\nPrepared models:')
     print(feature_extractor)
     print(classifier)
@@ -89,13 +103,13 @@ def run(args):
                                                                        device=device)
 
         # Calculate current total accuracy
-        acc = validation.validate_classifier(feature_extractor=feature_extractor,
-                                             classifier=classifier,
-                                             data_loader=ci_eval_dataloaders[task_id])
-        print(f'Total accuracy: {acc} %')
-        global_accuracies.append(acc)
+        total_acc = validation.validate_classifier(feature_extractor=feature_extractor,
+                                                   classifier=classifier,
+                                                   data_loader=ci_eval_dataloaders[task_id])
+        print(f'Total accuracy: {total_acc} %')
+        global_accuracies.append(total_acc)
         if args.log_wandb:
-            wandb.log({"Total accuracy": acc})
+            wandb.log({"Total accuracy": total_acc})
 
         # Validate Classifier on all tasks
         for i in range(task_id + 1):
@@ -109,27 +123,27 @@ def run(args):
                 wandb.log({f"Accuracy on task {i}": acc})
 
         # Global accuracy graph
-        if task_id == task_names[-1] and not args.final_task_only:
-            plt.plot(task_names, global_accuracies)
-            plt.title("Global accuracy")
-            plt.xlabel("Task id")
-            plt.ylabel("Accuracy")
-            ax = plt.gca()
-            ax.set_ylim([0, 100])
-            plt.show()
+        # if task_id == task_names[-1] and not args.final_task_only:
+        #     plt.plot(task_names, global_accuracies)
+        #     plt.title("Global accuracy")
+        #     plt.xlabel("Task id")
+        #     plt.ylabel("Accuracy")
+        #     ax = plt.gca()
+        #     ax.set_ylim([0, 100])
+        #     plt.show()
+        #
+        # # Per-task accuracy graph
+        # if task_id == task_names[-1] and not args.final_task_only:
+        #     for j in range(len(task_names)):
+        #         plt.plot(x[j], accuracy[j])
+        #     ax = plt.gca()
+        #     ax.set_ylim([0, 100])
+        #     plt.title("Accuracy per task")
+        #     plt.xlabel("Task id")
+        #     plt.ylabel("Accuracy")
+        #     plt.show()
 
-        # Per-task accuracy graph
-        if task_id == task_names[-1] and not args.final_task_only:
-            for j in range(len(task_names)):
-                plt.plot(x[j], accuracy[j])
-            ax = plt.gca()
-            ax.set_ylim([0, 100])
-            plt.title("Accuracy per task")
-            plt.xlabel("Task id")
-            plt.ylabel("Accuracy")
-            plt.show()
-
-    return
+    return total_acc
 
 
 if __name__ == '__main__':
