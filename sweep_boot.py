@@ -29,7 +29,14 @@ sweep_configuration = {
             'seed': 13,
             'optimizer': 'Adam',
             'mse_reduction': 'True',
-            'batch_size': {'max': 256, 'min': 32},
+            'batch_size': {
+                # integers between 32 and 256
+                # with evenly-distributed logarithms
+                'distribution': 'q_log_uniform_values',
+                'q': 8,
+                'min': 32,
+                'max': 256,
+            },
             'fe_type': 'resnet18',
             'feature_extractor_epochs': 30,
             'classifier_epochs': 5,
