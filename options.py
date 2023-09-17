@@ -57,13 +57,16 @@ def get_args(argv):
     parser.add_argument('--num_classes', default=0, type=int, help="Number of classes")
     parser.add_argument('--max_lr', type=float, default=0.05, help='Starting Learning rate')
     parser.add_argument('--min_lr', type=float, default=0.0005, help='Ending Learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
+    parser.add_argument('--fe_weight_decay', type=float, default=1e-5, help='Feature extractor weight decay')
+    parser.add_argument('--cl_weight_decay', type=float, default=1e-5, help='Classifier weight decay')
 
     # Training
     parser.add_argument('--generator_type', type=str, default="vae", help='vae|gan')
     parser.add_argument('--optimizer', default='Adam', choices=['Adam', 'SGD'], help='Optimiser types')
     parser.add_argument('--mse_reduction', default=False, action='store_true', help="Use MSE loss reduction type sum")
     parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--fe_lr', type=float, default=0.001, help='Feature extractor learning rate')
+    parser.add_argument('--cl_lr', type=float, default=0.001, help='Classifier learning rate')
     parser.add_argument('--load_feature_extractor', default=False, action='store_true', help="Load Feature Extractor")
     parser.add_argument('--load_classifier', default=False, action='store_true', help="Load Classifier")
     parser.add_argument('--feature_extractor_epochs', default=30, type=int, help="Feature Extractor training epochs")

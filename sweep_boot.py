@@ -29,6 +29,8 @@ sweep_configuration = {
             'n_tasks': {'value': 5},
             'seed': {'value': 13},
             'optimizer': {'value': 'Adam'},
+            'fe_type': {'value': 'resnet18'},
+            'generator_type': {'value': 'gan'},
             'mse_reduction': {'value': True},
             'batch_size': {
                 # integers between 32 and 256
@@ -38,17 +40,25 @@ sweep_configuration = {
                 'min': 32,
                 'max': 256,
             },
-            'fe_type': {'value': 'resnet18'},
-            'feature_extractor_epochs': {'value': 30},
-            'classifier_epochs': {'value': 5},
-            'generator_type': {'value': 'gan'},
-            'max_generations': {'value': 3},
+            'feature_extractor_epochs': {'values': [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]},
+            'classifier_epochs': {'values': [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]},
+            'max_generations': {'values': [1, 2, 3, 4, 5]},
+            'load_feature_extractor': {'value': False},
+            'load_classifier': {'value': False},
+            'generations_only': {'value': False},
             'biggan_training': {'value': True},
             'final_task_only': {'value': True},
             'train_aug': {'value': True},
+            'calc_noise': {'value': False},
             'skip_normalization': {'value': False},
             'offline_validation': {'value': False},
-            'cutmix': {'value': True},
+            'cutmix': {'values': [True, False]},
+            'cutmix_prob': {'values': [0.3, 0.4, 0.5, 0.6]},
+            'cutmix_alpha': {'value': 1.0},
+            'fe_weight_decay': {'values': [1e-4, 1e-5, 1e-6]},
+            'cl_weight_decay': {'values': [1e-4, 1e-5, 1e-6]},
+            'fe_lr': {'values': [0.0001, 0.0005, 0.001, 0.005, 0.01]},
+            'classifier_lr': {'values': [0.0001, 0.0005, 0.001, 0.005, 0.01]},
             'log_wandb': {'value': True},
             'gpuid': {'value': 0}
         }
@@ -60,4 +70,4 @@ sweep_id = wandb.sweep(
     project='test_sweep'
 )
 
-wandb.agent(sweep_id, function=main, count=2)
+wandb.agent(sweep_id, function=main, count=1)

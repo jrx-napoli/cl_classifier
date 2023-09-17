@@ -23,9 +23,9 @@ def get_fe_criterion(args):
 
 def get_optimiser(args, model):
     if args.optimizer.lower() == "adam":
-        return torch.optim.Adam(list(model.parameters()), lr=0.001, weight_decay=args.weight_decay)
+        return torch.optim.Adam(list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay)
     elif args.optimizer.lower() == "sgd":
-        return torch.optim.SGD(list(model.parameters()), lr=0.001, weight_decay=args.weight_decay)
+        return torch.optim.SGD(list(model.parameters()), lr=args.cl_lr, weight_decay=args.cl_weight_decay)
     else:
         raise NotImplementedError
 
@@ -69,7 +69,6 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
 
 
 def generate_images(args, generator, n_prev_examples, task_id):
-
     if args.generations_only:
         task_id += 1
 
@@ -127,6 +126,9 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
         start = time.time()
 
         for iteration, batch in enumerate(train_loader):
+
+            # if iteration == 5:
+            #     break
 
             # local data
             local_images, local_classes = batch
@@ -243,6 +245,9 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
         start = time.time()
 
         for iteration, batch in enumerate(train_loader):
+
+            # if iteration == 5:
+            #     break
 
             # local data
             local_images, local_classes = batch
