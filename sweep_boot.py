@@ -21,14 +21,15 @@ sweep_configuration = {
         },
     'parameters':
         {
-            'experiment_name': 'CIFAR10_BIGGAN_example',
-            'dataset': 'CIFAR10',
-            'num_classes': 10,
-            'n_classes_per_task': 2,
-            'n_tasks': 5,
-            'seed': 13,
-            'optimizer': 'Adam',
-            'mse_reduction': 'True',
+            'dataroot': {'value': 'data'},
+            'experiment_name': {'value': 'CIFAR10_BIGGAN_example'},
+            'dataset': {'value': 'CIFAR10'},
+            'num_classes': {'value': 10},
+            'n_classes_per_task': {'value': 2},
+            'n_tasks': {'value': 5},
+            'seed': {'value': 13},
+            'optimizer': {'value': 'Adam'},
+            'mse_reduction': {'value': True},
             'batch_size': {
                 # integers between 32 and 256
                 # with evenly-distributed logarithms
@@ -37,17 +38,19 @@ sweep_configuration = {
                 'min': 32,
                 'max': 256,
             },
-            'fe_type': 'resnet18',
-            'feature_extractor_epochs': 30,
-            'classifier_epochs': 5,
-            'generator_type': 'gan',
-            'max_generations': 3,
-            'biggan_training': 'True',
-            'final_task_only': 'True',
-            'train_aug': 'True',
-            'cutmix': 'True',
-            'log_wandb': 'True',
-            'gpuid': 0
+            'fe_type': {'value': 'resnet18'},
+            'feature_extractor_epochs': {'value': 30},
+            'classifier_epochs': {'value': 5},
+            'generator_type': {'value': 'gan'},
+            'max_generations': {'value': 3},
+            'biggan_training': {'value': True},
+            'final_task_only': {'value': True},
+            'train_aug': {'value': True},
+            'skip_normalization': {'value': False},
+            'offline_validation': {'value': False},
+            'cutmix': {'value': True},
+            'log_wandb': {'value': True},
+            'gpuid': {'value': 0}
         }
 }
 
@@ -57,4 +60,4 @@ sweep_id = wandb.sweep(
     project='test_sweep'
 )
 
-wandb.agent(sweep_id, function=main, count=10)
+wandb.agent(sweep_id, function=main, count=2)

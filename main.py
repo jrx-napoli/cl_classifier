@@ -16,7 +16,7 @@ from options import get_args
 
 def run(args):
 
-    torch.cuda.set_device(args.gpuid[0])
+    torch.cuda.set_device(args.gpuid)
     device = torch.device("cuda")
 
     if args.seed:
