@@ -6,7 +6,7 @@ wandb.login()
 
 
 def main():
-    wandb.init(project='test_sweep')
+    wandb.init(project='CIAFAR10_sweep')
     total_accuracy = run(wandb.config)
     wandb.log({'total_accuracy': total_accuracy})
 
@@ -67,7 +67,7 @@ sweep_configuration = {
 # 3: Start the sweep
 sweep_id = wandb.sweep(
     sweep=sweep_configuration,
-    project='test_sweep'
+    project='CIAFAR10_sweep'
 )
 
 wandb.agent(sweep_id, function=main, count=1)

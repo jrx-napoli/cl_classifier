@@ -16,23 +16,23 @@ from options import get_args
 
 def run(args):
 
-    torch.cuda.set_device(args.gpuid)
-    device = torch.device("cuda")
+    # torch.cuda.set_device(args.gpuid)
+    # device = torch.device("cuda")
+    #
+    # if args.seed:
+    #     print("Using manual seed = {}".format(args.seed))
+    #
+    #     random.seed(args.seed)
+    #     np.random.seed(args.seed)
+    #     torch.manual_seed(args.seed)
+    #     torch.cuda.manual_seed(args.seed)
+    #     torch.backends.cudnn.deterministic = True
+    #     torch.backends.cudnn.benchmark = False
+    # else:
+    #     print("WARNING: Not using manual seed - your experiments will not be reproducible")
 
-    if args.seed:
-        print("Using manual seed = {}".format(args.seed))
-
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        torch.cuda.manual_seed(args.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-    else:
-        print("WARNING: Not using manual seed - your experiments will not be reproducible")
-
-    # if args.log_wandb:
-    #     wandb.init(project=f"cl_classifier_{args.experiment_name}")
+    if args.log_wandb:
+        wandb.init(project=f"cl_classifier_{args.experiment_name}")
 
     # Get transformed data
     train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot,
