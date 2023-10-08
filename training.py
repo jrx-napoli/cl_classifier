@@ -25,7 +25,7 @@ def get_optimiser(args, model):
     if args.optimizer.lower() == "adam":
         return torch.optim.Adam(list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay)
     elif args.optimizer.lower() == "sgd":
-        return torch.optim.SGD(list(model.parameters()), lr=args.cl_lr, weight_decay=args.cl_weight_decay)
+        return torch.optim.SGD(list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay)
     else:
         raise NotImplementedError
 
@@ -234,7 +234,7 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
     print(f'Iterations /epoch: {n_iterations}')
     print(f'Generations /iteration: {n_prev_examples}')
 
-    optimizer = torch.optim.Adam(list(classifier.parameters()), lr=0.001, weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(list(classifier.parameters()), lr=0.001, weight_decay=args.cl_weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     criterion = nn.CrossEntropyLoss()
 

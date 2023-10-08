@@ -45,7 +45,7 @@ def run(args):
                                                     n_tasks=args.n_tasks,
                                                     n_classes_per_task=args.n_classes_per_task,
                                                     batch_size=args.batch_size,
-                                                    drop_last=True)
+                                                    drop_last=False)
 
     val_loaders, val_datasets = dataset_gen.get_CI_datasplit(dataset=val_dataset,
                                                              n_tasks=args.n_tasks,
