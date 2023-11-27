@@ -32,7 +32,7 @@ def run(args):
     #     print("WARNING: Not using manual seed - your experiments will not be reproducible")
 
     if args.log_wandb:
-        wandb.init(project=f"cl_classifier_{args.experiment_name}")
+        wandb.init(project=f"cl_classifier_{args.dataset}", name=f"{args.experiment_name}", config=vars(args))
 
     # Get transformed data
     train_dataset, val_dataset = dataset_gen.__dict__[args.dataset](args.dataroot,

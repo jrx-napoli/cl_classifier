@@ -250,7 +250,7 @@ def DoubleMNIST(dataroot, skip_normalization=False, train_aug=False):
 
 def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
     # normalize = transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-    normalize = transforms.Normalize(mean=[0.5], std=[0.5])
+    normalize = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
     if skip_normalization:
         val_transform = transforms.Compose([
@@ -266,7 +266,7 @@ def CIFAR10(dataroot, skip_normalization=False, train_aug=True):
 
     if train_aug:
         train_transform = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
+            # transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,

@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
+import os
 
 import wandb
 from gan_experiments import gan_utils
@@ -41,7 +42,7 @@ def get_scheduler(args, optimizer):
 
 def calculate_gan_noise(args, generator, train_loader, task_id, device):
     print("\nNoise optimisation for GAN embeddings")
-    n_iterations = 500
+    n_iterations = 600
     noise_cache = None
 
     for iteration, batch in enumerate(train_loader):
@@ -64,7 +65,7 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
         else:
             noise_cache = torch.cat((noise_cache, local_translator_emb), 0)
 
-    torch.save(noise_cache, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_noise_cache")
+    torch.save(noise_cache, os.path.join(args.models_root, f"model{task_id}_noise_cache"))
     return noise_cache
 
 

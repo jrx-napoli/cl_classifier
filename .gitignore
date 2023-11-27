@@ -6,3 +6,4 @@ mnist_data
 models
 .vscode
 wandb
+__pycache__

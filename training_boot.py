@@ -1,4 +1,5 @@
 import torch
+import os
 
 import training
 
@@ -9,11 +10,10 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
 
     # Load generative models
     if args.generator_type == "vae":
-        local_vae = torch.load(f'models/vae/{args.experiment_name}/model{task_id}_local_vae').to(device)
-        generator = torch.load(f'models/vae/{args.experiment_name}/model{task_id}_curr_decoder').to(device)
+        local_vae = torch.load(os.path.join(args.models_root, f"model{task_id}_local_vae")).to(device)
+        generator = torch.load(os.path.join(args.models_root, f"model{task_id}_curr_decoder")).to(device)
     elif args.generator_type == "gan":
-        generator = torch.load(f'models/gan/{args.experiment_name}/model{task_id}_curr_global_generator',
-                               map_location="cuda").to(device)
+        generator = torch.load(os.path.join(args.models_root, f"model{task_id}_curr_global_generator")).to(device)
     else:
         raise NotImplementedError
     print(f'Loaded generator')
@@ -26,12 +26,11 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                                                    task_id=task_id,
                                                    device=device)
     elif args.generator_type == "gan":
-        noise_cache = torch.load(f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_noise_cache")
+        noise_cache = torch.load(os.path.join(args.models_root, f"model{task_id}_noise_cache"))
 
     # Train models
     if args.load_feature_extractor:
-        feature_extractor = torch.load(
-            f'models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor').to(device)
+        feature_extractor = torch.load(os.path.join(args.models_root, f"model{task_id}_feature_extractor")).to(device)
         print("Loaded feature extractor")
     else:
         print("\nTrain feature extractor")
@@ -44,12 +43,10 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                                                                           task_id=task_id,
                                                                           device=device)
         print("Done training feature extractor\n")
-        torch.save(feature_extractor,
-                   f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_feature_extractor")
-
+        torch.save(feature_extractor, os.path.join(args.models_root, f"model{task_id}_feature_extractor"))
+#
     if args.load_classifier:
-        classifier = torch.load(f'models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier').to(
-            device)
+        classifier = torch.load(os.path.join(args.models_root, f"model{task_id}_classifier")).to(device)
         print("Loaded classifier")
     else:
         print("\nTrain classifier")
@@ -62,7 +59,7 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
                                                task_id=task_id,
                                                device=device)
         print("Done training classifier\n")
-        torch.save(classifier, f"models/{args.generator_type}/{args.experiment_name}/model{task_id}_classifier")
+        torch.save(classifier, os.path.join(args.models_root, f"model{task_id}_classifier"))
 
     torch.cuda.empty_cache()
     return feature_extractor, classifier

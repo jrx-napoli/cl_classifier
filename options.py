@@ -6,6 +6,7 @@ def get_args(argv):
 
     # General
     parser.add_argument('--experiment_name', type=str, default='default_run', help='Name of current experiment')
+    parser.add_argument('--models_root', type=str, default='models/', help='Name of dir with models')
     parser.add_argument('--dataset', type=str, default='MNIST', help="Dataset to be used in training procedure")
     parser.add_argument('--n_tasks', default=5, type=int, help="Number of tasks")
     parser.add_argument('--n_classes_per_task', default=2, type=int, help="Number of classes per task")

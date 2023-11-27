@@ -11,9 +11,9 @@ def create_feature_extractor(device, latent_size, in_size, fe_type):
     elif fe_type == "conv":
         return Conv(latent_size=latent_size).to(device)
     elif fe_type == "resnet18":
-        return torchvision.models.resnet18(weights=None, num_classes=latent_size).to(device)
+        return torchvision.models.resnet18(num_classes=latent_size).to(device)
     elif fe_type == "resnet34":
-        return torchvision.models.resnet34(weights=None, num_classes=latent_size).to(device)
+        return torchvision.models.resnet34(num_classes=latent_size).to(device)
 
 
 def create_classifier(latent_size, n_classes, hidden_size, device):
