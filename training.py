@@ -24,9 +24,13 @@ def get_fe_criterion(args):
 
 def get_optimiser(args, model):
     if args.optimizer.lower() == "adam":
-        return torch.optim.Adam(list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay)
+        return torch.optim.Adam(
+            list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay
+        )
     elif args.optimizer.lower() == "sgd":
-        return torch.optim.SGD(list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay)
+        return torch.optim.SGD(
+            list(model.parameters()), lr=args.fe_lr, weight_decay=args.fe_weight_decay
+        )
     else:
         raise NotImplementedError
 
@@ -51,13 +55,15 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
         local_imgs, local_classes = batch
         local_imgs = local_imgs.to(device)
         local_classes = local_classes.to(device)
-        local_translator_emb = gan_utils.optimize_noise(images=local_imgs,
-                                                        generator=generator,
-                                                        n_iterations=n_iterations,
-                                                        task_id=task_id,
-                                                        lr=0.01,
-                                                        labels=local_classes,
-                                                        biggan_training=args.biggan_training)
+        local_translator_emb = gan_utils.optimize_noise(
+            images=local_imgs,
+            generator=generator,
+            n_iterations=n_iterations,
+            task_id=task_id,
+            lr=0.01,
+            labels=local_classes,
+            biggan_training=args.biggan_training,
+        )
         local_translator_emb = local_translator_emb.detach()
 
         if noise_cache is None:
@@ -65,7 +71,9 @@ def calculate_gan_noise(args, generator, train_loader, task_id, device):
         else:
             noise_cache = torch.cat((noise_cache, local_translator_emb), 0)
 
-    torch.save(noise_cache, os.path.join(args.models_root, f"model{task_id}_noise_cache"))
+    torch.save(
+        noise_cache, os.path.join(args.models_root, f"model{task_id}_noise_cache")
+    )
     return noise_cache
 
 
@@ -74,28 +82,50 @@ def generate_images(args, generator, n_prev_examples, task_id):
         task_id += 1
 
     if args.generator_type == "vae":
-        generations, classes, random_noise, translator_emb = vae_utils.generate_previous_data(
+        (
+            generations,
+            classes,
+            random_noise,
+            translator_emb,
+        ) = vae_utils.generate_previous_data(
             generator,
             n_tasks=task_id,
             n_img=n_prev_examples,
             num_local=args.batch_size,
             return_z=True,
             translate_noise=True,
-            same_z=False)
+            same_z=False,
+        )
 
     elif args.generator_type == "gan":
         # TODO bugfix: number of generations is rounded down
-        generations, classes, random_noise, translator_emb = gan_utils.generate_previous_data(
-            n_prev_tasks=(2 * task_id),  # TODO adjust for specific dataset - n_classes for each tasks?
+        (
+            generations,
+            classes,
+            random_noise,
+            translator_emb,
+        ) = gan_utils.generate_previous_data(
+            n_prev_tasks=(
+                2 * task_id
+            ),  # TODO adjust for specific dataset - n_classes for each tasks?
             n_prev_examples=n_prev_examples,
             curr_global_generator=generator,
-            biggan_training=args.biggan_training)
+            biggan_training=args.biggan_training,
+        )
 
     return generations, classes, random_noise, translator_emb
 
 
-def train_feature_extractor(args, feature_extractor, decoder, task_id, device, train_loader,
-                            local_vae=None, noise_cache=None):
+def train_feature_extractor(
+    args,
+    feature_extractor,
+    decoder,
+    task_id,
+    device,
+    train_loader,
+    local_vae=None,
+    noise_cache=None,
+):
     if args.log_wandb:
         wandb.watch(feature_extractor)
     feature_extractor.train()
@@ -111,8 +141,8 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
     else:
         n_prev_examples = int(batch_size * min(task_id + 1, args.max_generations))
 
-    print(f'Iterations /epoch: {n_iterations}')
-    print(f'Generations /iteration: {n_prev_examples}')
+    print(f"Iterations /epoch: {n_iterations}")
+    print(f"Generations /iteration: {n_prev_examples}")
     if args.log_wandb:
         wandb.run.summary["Iterations per epoch"] = n_iterations
         wandb.run.summary["Generations per iteration"] = n_prev_examples
@@ -127,7 +157,6 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
         start = time.time()
 
         for iteration, batch in enumerate(train_loader):
-
             # if iteration == 5:
             #     break
 
@@ -136,24 +165,35 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
             local_images = local_images.to(device)
 
             if args.generator_type == "vae":
-                local_translator_emb = local_vae(x=local_images,
-                                                 task_id=local_classes,
-                                                 conds=None,
-                                                 temp=None,
-                                                 encode_to_noise=True)
+                local_translator_emb = local_vae(
+                    x=local_images,
+                    task_id=local_classes,
+                    conds=None,
+                    temp=None,
+                    encode_to_noise=True,
+                )
                 local_translator_emb = local_translator_emb.detach()
             else:
                 emb_start_point = iteration * batch_size
-                emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
+                emb_end_point = min(
+                    len(train_loader.dataset), (iteration + 1) * batch_size
+                )
                 local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
             if args.generations_only or task_id > 0:
                 with torch.no_grad():
-                    generations, classes, random_noise, translator_emb = generate_images(args=args,
-                                                                                         generator=decoder,
-                                                                                         n_prev_examples=n_prev_examples,
-                                                                                         task_id=task_id)
+                    (
+                        generations,
+                        classes,
+                        random_noise,
+                        translator_emb,
+                    ) = generate_images(
+                        args=args,
+                        generator=decoder,
+                        n_prev_examples=n_prev_examples,
+                        task_id=task_id,
+                    )
                     translator_emb = translator_emb.detach()
 
             # concat local and generated data
@@ -182,11 +222,15 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
 
                 do_cutmix = args.cutmix and np.random.rand(1) < args.cutmix_prob
                 if do_cutmix:
-                    inputs, labels_a, labels_b, lam = cutmix_images(x=images_combined[start_point:end_point],
-                                                                    y=emb_combined[start_point:end_point],
-                                                                    alpha=args.cutmix_alpha)
+                    inputs, labels_a, labels_b, lam = cutmix_images(
+                        x=images_combined[start_point:end_point],
+                        y=emb_combined[start_point:end_point],
+                        alpha=args.cutmix_alpha,
+                    )
                     out = feature_extractor(inputs)
-                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b)
+                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(
+                        out, labels_b
+                    )
                 else:
                     out = feature_extractor(images_combined[start_point:end_point])
                     loss = criterion(out, emb_combined[start_point:end_point])
@@ -198,25 +242,46 @@ def train_feature_extractor(args, feature_extractor, decoder, task_id, device, t
                     losses.append(loss.item())
                     for i, output in enumerate(out):
                         cosine_similarities.append(
-                            (torch.cosine_similarity(output, emb_combined[start_point:end_point][i], dim=0)).item())
+                            (
+                                torch.cosine_similarity(
+                                    output,
+                                    emb_combined[start_point:end_point][i],
+                                    dim=0,
+                                )
+                            ).item()
+                        )
 
         scheduler.step()
 
         if args.log_wandb:
             wandb.log({"Feature-extractor loss": np.round(np.mean(losses), 3)})
-            wandb.log({"Mean cosine similarity": np.round(np.mean(cosine_similarities), 3)})
-        print("Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(epoch,
-                                                                                 n_epochs,
-                                                                                 np.round(np.mean(losses), 3),
-                                                                                 np.round(
-                                                                                     np.mean(cosine_similarities), 3),
-                                                                                 np.round(time.time() - start), 3))
+            wandb.log(
+                {"Mean cosine similarity": np.round(np.mean(cosine_similarities), 3)}
+            )
+        print(
+            "Epoch: {}/{}, loss: {}, cosine similarity: {}, took: {} s".format(
+                epoch,
+                n_epochs,
+                np.round(np.mean(losses), 3),
+                np.round(np.mean(cosine_similarities), 3),
+                np.round(time.time() - start),
+                3,
+            )
+        )
 
     return feature_extractor, noise_cache
 
 
-def train_classifier(args, classifier, decoder, task_id, device, train_loader,
-                     local_vae=None, noise_cache=None):
+def train_classifier(
+    args,
+    classifier,
+    decoder,
+    task_id,
+    device,
+    train_loader,
+    local_vae=None,
+    noise_cache=None,
+):
     if args.log_wandb:
         wandb.watch(classifier)
     decoder.translator.eval()
@@ -232,10 +297,12 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
     else:
         n_prev_examples = int(batch_size * min(task_id + 1, args.max_generations))
 
-    print(f'Iterations /epoch: {n_iterations}')
-    print(f'Generations /iteration: {n_prev_examples}')
+    print(f"Iterations /epoch: {n_iterations}")
+    print(f"Generations /iteration: {n_prev_examples}")
 
-    optimizer = torch.optim.Adam(list(classifier.parameters()), lr=0.001, weight_decay=args.cl_weight_decay)
+    optimizer = torch.optim.Adam(
+        list(classifier.parameters()), lr=args.cl_lr, weight_decay=args.cl_weight_decay
+    )
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     criterion = nn.CrossEntropyLoss()
 
@@ -246,7 +313,6 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
         start = time.time()
 
         for iteration, batch in enumerate(train_loader):
-
             # if iteration == 5:
             #     break
 
@@ -255,25 +321,36 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
             local_images = local_images.to(device)
 
             if args.generator_type == "vae":
-                local_translator_emb = local_vae(x=local_images,
-                                                 task_id=local_classes,
-                                                 conds=None,
-                                                 temp=None,
-                                                 encode_to_noise=True)
+                local_translator_emb = local_vae(
+                    x=local_images,
+                    task_id=local_classes,
+                    conds=None,
+                    temp=None,
+                    encode_to_noise=True,
+                )
                 local_translator_emb = local_translator_emb.detach()
             else:
                 local_classes = local_classes.to(device)
                 emb_start_point = iteration * batch_size
-                emb_end_point = min(len(train_loader.dataset), (iteration + 1) * batch_size)
+                emb_end_point = min(
+                    len(train_loader.dataset), (iteration + 1) * batch_size
+                )
                 local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
             if args.generations_only or task_id > 0:
                 with torch.no_grad():
-                    generations, classes, random_noise, translator_emb = generate_images(args=args,
-                                                                                         generator=decoder,
-                                                                                         n_prev_examples=n_prev_examples,
-                                                                                         task_id=task_id)
+                    (
+                        generations,
+                        classes,
+                        random_noise,
+                        translator_emb,
+                    ) = generate_images(
+                        args=args,
+                        generator=decoder,
+                        n_prev_examples=n_prev_examples,
+                        task_id=task_id,
+                    )
                     translator_emb = translator_emb.detach()
                     classes = classes.long()
 
@@ -302,20 +379,30 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
 
                 do_cutmix = args.cutmix and np.random.rand(1) < args.cutmix_prob
                 if do_cutmix:
-                    inputs, labels_a, labels_b, lam = cutmix_repr(x=emb_combined[start_point:end_point],
-                                                                  y=classes_combined[start_point:end_point],
-                                                                  alpha=args.cutmix_alpha)
+                    inputs, labels_a, labels_b, lam = cutmix_repr(
+                        x=emb_combined[start_point:end_point],
+                        y=classes_combined[start_point:end_point],
+                        alpha=args.cutmix_alpha,
+                    )
                     out = classifier(inputs)
-                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(out, labels_b)
+                    loss = lam * criterion(out, labels_a) + (1 - lam) * criterion(
+                        out, labels_b
+                    )
                 else:
                     out = classifier(emb_combined[start_point:end_point])
-                    loss = criterion(out, classes_combined[start_point:end_point].to(classifier.device))
+                    loss = criterion(
+                        out,
+                        classes_combined[start_point:end_point].to(classifier.device),
+                    )
 
                 loss.backward()
                 optimizer.step()
 
                 with torch.no_grad():
-                    acc = get_correct_sum(out, classes_combined[start_point:end_point].to(classifier.device))
+                    acc = get_correct_sum(
+                        out,
+                        classes_combined[start_point:end_point].to(classifier.device),
+                    )
                     accuracy += acc.item()
                     total += len(classes_combined[start_point:end_point])
                     losses.append(loss.item())
@@ -324,12 +411,18 @@ def train_classifier(args, classifier, decoder, task_id, device, train_loader,
 
         if epoch % 1 == 0:
             if args.log_wandb:
-                wandb.log({"Classifier loss": np.round(np.mean(losses), 3)})
+                wandb.log({"Classifier loss": np.mean(losses)})
                 wandb.log({"Training accuracy": np.round(accuracy * 100 / total, 3)})
-            print("Epoch: {}/{}, loss: {}, Acc: {} %, took: {} s".format(epoch, n_epochs,
-                                                                         np.round(np.mean(losses), 3),
-                                                                         np.round(accuracy * 100 / total, 3),
-                                                                         np.round(time.time() - start), 3))
+            print(
+                "Epoch: {}/{}, loss: {}, Acc: {} %, took: {} s".format(
+                    epoch,
+                    n_epochs,
+                    np.mean(losses),
+                    np.round(accuracy * 100 / total, 3),
+                    np.round(time.time() - start),
+                    3,
+                )
+            )
 
     return classifier
 
