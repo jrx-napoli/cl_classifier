@@ -19,14 +19,17 @@ def train_classifier(args, feature_extractor, classifier, train_loader, task_id,
     print(f'Loaded generator')
 
     # Calculate GAN noise
-    if args.calc_noise:
-        noise_cache = training.calculate_gan_noise(args=args,
-                                                   generator=generator,
-                                                   train_loader=train_loader,
-                                                   task_id=task_id,
-                                                   device=device)
-    elif args.generator_type == "gan":
-        noise_cache = torch.load(os.path.join(args.models_root, f"model{task_id}_noise_cache"))
+    if not args.generations_only:
+        if args.calc_noise:
+            noise_cache = training.calculate_gan_noise(args=args,
+                                                    generator=generator,
+                                                    train_loader=train_loader,
+                                                    task_id=task_id,
+                                                    device=device)
+        elif args.generator_type == "gan":
+            noise_cache = torch.load(os.path.join(args.models_root, f"model{task_id}_noise_cache"))
+    else:
+        noise_cache = None
 
     # Train models
     if args.load_feature_extractor:

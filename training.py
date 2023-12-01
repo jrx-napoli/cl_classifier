@@ -174,11 +174,12 @@ def train_feature_extractor(
                 )
                 local_translator_emb = local_translator_emb.detach()
             else:
-                emb_start_point = iteration * batch_size
-                emb_end_point = min(
-                    len(train_loader.dataset), (iteration + 1) * batch_size
-                )
-                local_translator_emb = noise_cache[emb_start_point:emb_end_point]
+                if not args.generations_only:
+                    emb_start_point = iteration * batch_size
+                    emb_end_point = min(
+                        len(train_loader.dataset), (iteration + 1) * batch_size
+                    )
+                    local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
             if args.generations_only or task_id > 0:
@@ -330,12 +331,13 @@ def train_classifier(
                 )
                 local_translator_emb = local_translator_emb.detach()
             else:
-                local_classes = local_classes.to(device)
-                emb_start_point = iteration * batch_size
-                emb_end_point = min(
-                    len(train_loader.dataset), (iteration + 1) * batch_size
-                )
-                local_translator_emb = noise_cache[emb_start_point:emb_end_point]
+                if not args.generations_only:
+                    local_classes = local_classes.to(device)
+                    emb_start_point = iteration * batch_size
+                    emb_end_point = min(
+                        len(train_loader.dataset), (iteration + 1) * batch_size
+                    )
+                    local_translator_emb = noise_cache[emb_start_point:emb_end_point]
 
             # rehearsal data
             if args.generations_only or task_id > 0:
