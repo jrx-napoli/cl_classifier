@@ -106,8 +106,8 @@ def generate_images(args, generator, n_prev_examples, task_id):
             translator_emb,
         ) = gan_utils.generate_previous_data(
             n_prev_tasks=(
-                2 * task_id
-            ),  # TODO adjust for specific dataset - n_classes for each tasks?
+                args.n_classes_per_task * task_id
+            ),
             n_prev_examples=n_prev_examples,
             curr_global_generator=generator,
             biggan_training=args.biggan_training,
